@@ -21,9 +21,6 @@ const PROFILE_SELECT = [
   'last_name:lastName',
   'phone_number:phone',
   'profile_email:email',
-  'dob_month:dobMonth',
-  'dob_day:dobDay',
-  'dob_year:dobYear',
   'license_number:licenseNumber',
   'nabp_eprofile_id:nabpEProfileId',
   'is_active:is_active',
@@ -113,9 +110,6 @@ export const profileService = {
         last_name: data.lastName,
         phone_number: data.phone ?? null,
         profile_email: data.email ?? null,
-        dob_month: toIntOrNull(data.dobMonth),
-        dob_day: toIntOrNull(data.dobDay),
-        dob_year: toIntOrNull(data.dobYear),
         license_number: data.licenseNumber ?? null,
         nabp_eprofile_id: data.nabpEProfileId ?? null,
       };
@@ -139,9 +133,6 @@ export const profileService = {
       if (updates.lastName !== undefined) patch.last_name = updates.lastName;
       if (updates.phone !== undefined) patch.phone_number = updates.phone ?? null;
       if (updates.email !== undefined) patch.profile_email = updates.email ?? null;
-      if (updates.dobMonth !== undefined) patch.dob_month = toIntOrNull(updates.dobMonth);
-      if (updates.dobDay !== undefined) patch.dob_day = toIntOrNull(updates.dobDay);
-      if (updates.dobYear !== undefined) patch.dob_year = toIntOrNull(updates.dobYear);
       if (updates.licenseNumber !== undefined) patch.license_number = updates.licenseNumber ?? null;
       if (updates.nabpEProfileId !== undefined) patch.nabp_eprofile_id = updates.nabpEProfileId ?? null;
 

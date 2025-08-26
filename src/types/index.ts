@@ -125,9 +125,6 @@ firstName: string;
 lastName: string;
 phone?: string; // DB: phone_number
 email?: string; // DB: profile_email
-dobMonth?: string; // DB: dob_month (int)
-dobDay?: string; // DB: dob_day (int)
-dobYear?: string; // DB: dob_year (int)
 licenseNumber?: string; // DB: license_number
 nabpEProfileId?: string; // DB: nabp_eprofile_id
 is_active?: boolean; // DB soft-delete flag; not the “selected” UI concept
@@ -141,9 +138,6 @@ firstName: string;
 lastName: string;
 phone?: string;
 email?: string;
-dobMonth?: string;
-dobDay?: string;
-dobYear?: string;
 licenseNumber?: string;
 nabpEProfileId?: string;
 }
