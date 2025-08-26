@@ -1,21 +1,52 @@
 /**
- * Type definitions for ClinicalRxQ application
- */
+* Type definitions for ClinicalRxQ application (profiles & related)
+*
+* Conventions:
+* - Database uses snake_case; the service layer aliases fields to camelCase on SELECT.
+* - App/domain types below are camelCase and should be used throughout the UI.
+* - Role enum strings MUST match Postgres enum labels exactly (case & spaces preserved).
+*/
 
-// Account type matches public.accounts table in Supabase
+
+// =============================
+// Accounts (app camelCase; PostgREST aliases map snake_case → camelCase)
+// =============================
+export type AccountId = string;
+
+
+// DB column is text; constrain via union later if you formalize allowed states
+export type SubscriptionStatus = string;
+
+
 export interface Account {
-  id: string;
-  email: string;
-  pharmacy_name: string;
-  subscription_status: 'active' | 'inactive' | 'cancelled';
-  created_at: string;
-  updated_at: string;
-  pharmacy_phone?: string;
-  address1?: string;
-  city?: string;
-  state?: string;
-  zipcode?: string;
+id: AccountId; // DB: id (uuid) = auth.users.id
+email: string; // DB: email
+pharmacyName?: string; // DB: pharmacy_name
+subscriptionStatus: SubscriptionStatus; // DB: subscription_status (text)
+createdAt: string; // DB: created_at (timestamptz)
+updatedAt: string; // DB: updated_at (timestamptz)
+pharmacyPhone?: string; // DB: pharmacy_phone
+address1?: string; // DB: address1
+city?: string; // DB: city
+state?: string; // DB: state
+zipcode?: string; // DB: zipcode
 }
+
+
+// Ask PostgREST to alias DB snake_case → camelCase in responses for accounts
+export const ACCOUNTS_SELECT = [
+'id',
+'email',
+'pharmacy_name:pharmacyName',
+'subscription_status:subscriptionStatus',
+'created_at:createdAt',
+'updated_at:updatedAt',
+'pharmacy_phone:pharmacyPhone',
+'address1',
+'city',
+'state',
+'zipcode',
+].join(',');
 
 export interface Program {
   id: string;
@@ -49,46 +80,75 @@ export interface Resource {
   category: string;
 }
 
-// Profile system types
-export type ProfileRole = 'Pharmacist-PIC' | 'Pharmacist-Staff' | 'Pharmacy Technician';
+// =============================
+// Profiles
+// =============================
+/**
+* EXACT Postgres enum labels (case & spaces matter)
+* 'Pharmacist' | 'Pharmacist-PIC' | 'Pharmacy Technician' | 'Intern' | 'Pharmacy'
+*/
+export type ProfileRole =
+| 'Pharmacist'
+| 'Pharmacist-PIC'
+| 'Pharmacy Technician'
+| 'Intern'
+| 'Pharmacy';
 
+
+/** Canonical order for UI lists (matches DB order) */
+export const PROFILE_ROLES_ORDER: ProfileRole[] = [
+'Pharmacist',
+'Pharmacist-PIC',
+'Pharmacy Technician',
+'Intern',
+'Pharmacy',
+];
+
+
+/** Default role auto-created for every account */
+export const DEFAULT_ACCOUNT_PROFILE_ROLE: ProfileRole = 'Pharmacy';
+
+
+/** Ready-to-use options for a <Select> control */
+export const ROLE_OPTIONS = PROFILE_ROLES_ORDER.map((value) => ({ value, label: value }));
+
+
+/**
+* Stored profile shape used across the app.
+* Note: role may be null in DB, so the app model allows null.
+*/
 export interface PharmacyProfile {
-  id: string;
-  member_account_id: string;
-  
-  // Required fields
-  role: ProfileRole;
-  firstName: string;
-  lastName: string;
-  
-  // Optional fields
-  phone?: string;
-  email?: string;
-  dobMonth?: string; // "01"-"12"
-  dobDay?: string;   // "01"-"31" 
-  dobYear?: string;  // "1950"-"2010"
-  licenseNumber?: string;
-  nabpEProfileId?: string;
-  
-  // System fields
-  is_active: boolean;
-  createdAt: string;
-  updatedAt: string;
+id: string;
+member_account_id: string;
+role: ProfileRole | null; // DB column is nullable
+firstName: string;
+lastName: string;
+phone?: string; // DB: phone_number
+email?: string; // DB: profile_email
+dobMonth?: string; // DB: dob_month (int)
+dobDay?: string; // DB: dob_day (int)
+dobYear?: string; // DB: dob_year (int)
+licenseNumber?: string; // DB: license_number
+nabpEProfileId?: string; // DB: nabp_eprofile_id
+is_active?: boolean; // DB soft-delete flag; not the “selected” UI concept
 }
 
+
+/** Create/edit payloads used by forms */
 export interface CreateProfileData {
-  role: ProfileRole;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  email?: string;
-  dobMonth?: string;
-  dobDay?: string;
-  dobYear?: string;
-  licenseNumber?: string;
-  nabpEProfileId?: string;
+role: ProfileRole; // required for user-created profiles
+firstName: string;
+lastName: string;
+phone?: string;
+email?: string;
+dobMonth?: string;
+dobDay?: string;
+dobYear?: string;
+licenseNumber?: string;
+nabpEProfileId?: string;
 }
+
 
 export interface ProfileFormData extends CreateProfileData {
-  // Same as CreateProfileData for forms
+// Same as CreateProfileData for forms
 }

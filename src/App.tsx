@@ -1,6 +1,5 @@
 /**
  * Main application component with routing
- * - Purged Airtable: removed DevAirtableBootstrap and any Airtable-related bootstraps.
  * - Keeps global ErrorBoundary, Toaster, ScrollToTop, BackToTop.
  */
 
