@@ -1,8 +1,8 @@
 /**
  * Member Content page (Programs listing, Supabase-only)
- * - Purpose: Show available programs discovered from Supabase-aware catalog (no Airtable).
+ * - Purpose: Show available programs discovered from Supabase tables.
  * - Layout: AppShell with MemberSidebar (consistent member frame).
- * - Data: listProgramsFromStorage() from storageCatalog (ProgramSlugs + curated metadata).
+ * - Data: DB-backed contentApi (no Airtable, no storageCatalog).
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -20,23 +20,21 @@ import Breadcrumbs from '../components/common/Breadcrumbs';
 import SafeText from '../components/common/SafeText';
 import AppShell from '../components/layout/AppShell';
 import MemberSidebar from '../components/layout/MemberSidebar';
-import {
-  listProgramsFromStorage,
-  type ProgramListItem,
-} from '../services/storageCatalog';
+
+import { listPrograms, type Program } from '../services/contentApi';
 
 /** UI type for program card */
 interface ProgramUIItem {
   slug: string;
   title: string;
   description: string | null | undefined;
-  level?: string;
+  level?: string | null;
   color: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
 /** Visual mapping helper (placeholder: all brand gradient) */
-function getProgramVisuals(level?: string) {
+function getProgramVisuals(level?: string | null) {
   const lower = (level || '').toLowerCase();
   if (lower.includes('advanced') || lower.includes('expert')) {
     return { color: 'from-blue-600 via-cyan-500 to-teal-300', icon: Zap };
@@ -51,17 +49,17 @@ function getProgramVisuals(level?: string) {
  * MemberContent component (Supabase-backed)
  */
 export default function MemberContent() {
-  const [programs, setPrograms] = useState<ProgramListItem[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /** Load program list (Supabase catalog, no API routes) */
+  /** Load program list (Supabase tables via contentApi) */
   useEffect(() => {
     async function load() {
       try {
         setLoading(true);
         setError(null);
-        const items = await listProgramsFromStorage();
+        const items = await listPrograms();
         setPrograms(items || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load programs');
@@ -78,12 +76,12 @@ export default function MemberContent() {
   const programUIItems: ProgramUIItem[] = useMemo(
     () =>
       (programs || []).map((p) => {
-        const visuals = getProgramVisuals(undefined);
+        const visuals = getProgramVisuals(p.experienceLevel ?? null);
         return {
           slug: p.slug,
           title: p.name,
           description: p.description,
-          level: undefined,
+          level: p.experienceLevel ?? null,
           color: visuals.color,
           icon: visuals.icon,
         };
