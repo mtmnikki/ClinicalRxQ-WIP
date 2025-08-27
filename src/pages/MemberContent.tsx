@@ -20,10 +20,7 @@ import Breadcrumbs from '../components/common/Breadcrumbs';
 import SafeText from '../components/common/SafeText';
 import AppShell from '../components/layout/AppShell';
 import MemberSidebar from '../components/layout/MemberSidebar';
-import {
-  listProgramsFromStorage,
-  type ProgramListItem,
-} from '../services/storageCatalog';
+import { listPrograms, type Program } from '../services/contentApi';
 
 /** UI type for program card */
 interface ProgramUIItem {
