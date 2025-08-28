@@ -15,8 +15,6 @@ export interface MemberInfo {
   lastLoginISO?: string;
   subscriptionStatus?: 'Active' | 'Expired' | 'Expiring';
   email?: string;
-  firstName?: string;
-  lastName?: string;
 }
 
 /**
@@ -57,18 +55,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (s === 'cancelled' || s === 'inactive') subscriptionStatus = 'Expired';
     if (s === 'active') subscriptionStatus = 'Active';
 
-    // Extract first and last name from the user.name or user metadata
-    const nameParts = user.name.split(' ');
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || '';
 
     return {
       pharmacyName: user.name,
       lastLoginISO: user.createdAt ? new Date(user.createdAt).toISOString() : undefined,
       subscriptionStatus,
       email: user.email,
-      firstName,
-      lastName,
     };
   }, [isAuthenticated, user]);
 
