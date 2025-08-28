@@ -84,9 +84,11 @@ export default function ProfileGate({ children }: ProfileGateProps) {
             <div className="rounded-lg bg-blue-50 p-4">
               <h4 className="font-medium text-blue-900">Profile Types Available:</h4>
               <ul className="mt-2 space-y-1 text-sm text-blue-800">
+                <li>• Pharmacist</li>
                 <li>• Pharmacist-PIC</li>
-                <li>• Pharmacist-Staff</li>
                 <li>• Pharmacy Technician</li>
+                <li>• Intern</li>
+                <li>• Pharmacy</li>
               </ul>
               <p className="mt-2 text-xs text-blue-700">
                 All roles have equal access to ClinicalRxQ resources.
