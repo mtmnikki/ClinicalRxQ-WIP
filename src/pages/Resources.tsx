@@ -8,8 +8,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import AppShell from '../components/layout/AppShell';
 import MemberSidebar from '../components/layout/MemberSidebar';
-import ProgramResourceRow from '../components/resources/ProgramResourceRow';
-import { listAllFiles, type FileItem } from '../services/contentApi';
+import {
+  ProgramSlugs,
+  getProgramResourcesGrouped,
+  getGlobalCategory,
+  type ProgramSlug,
+} from '../services/contentApi';
 
 type Params = {
   q?: string;

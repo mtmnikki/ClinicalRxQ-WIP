@@ -272,10 +272,10 @@ export const authService = {
       return {
         id: user.id,
         email: user.email || '',
-        first_name: user.user_metadata?.first_name || '',
-        last_name: user.user_metadata?.last_name || '',
-        pharmacy_name: user.user_metadata?.pharmacy_name || '',
-        subscription_status: user.user_metadata?.subscription_status || 'Active',
+        first_name: (user.user_metadata?.first_name as string) || '',
+        last_name: (user.user_metadata?.last_name as string) || '',
+        pharmacy_name: (user.user_metadata?.pharmacy_name as string) || '',
+        subscription_status: (user.user_metadata?.subscription_status as string) || 'Active',
         created_at: user.created_at || new Date().toISOString(),
         updated_at: user.updated_at || new Date().toISOString(),
       };
@@ -357,12 +357,14 @@ export const bookmarkService = {
     return [];
   },
   async addBookmark(resourceType: string, resourceId: string) {
-    const session = await authService.getSession();
-    const userId = session?.user?.id;
-    if (!userId) throw new Error('Not authenticated');
+    const user = await supabaseAuth.getUser();
+    if (!user) {
+      throw new Error('No authenticated user');
+    }
+    
     return {
       id: crypto.randomUUID(),
-      user_id: userId,
+      user_id: user.id,
       resource_type: resourceType,
       resource_id: resourceId,
       created_at: new Date().toISOString(),

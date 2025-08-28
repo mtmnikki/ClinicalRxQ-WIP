@@ -1,151 +1,382 @@
 /**
- * DB-backed content API (PostgREST).
- * - Uses SELECT aliases so app-level keys are camelCase while DB stays snake_case.
- * - Fetches via Supabase REST with anon key; server enforces RLS.
+ * Content API Service - Production implementation using official Supabase client
+ * Leverages storage_files_catalog table with proper joins and filters
+ * Uses official @supabase/supabase-js client with full TypeScript support
  */
 
+import { createClient } from '@supabase/supabase-js';
+import type { Database } from '../../database.types';
 import { getSupabaseUrl, getSupabaseAnonKey } from '../config/supabaseConfig';
 
-/** Program entity (app-level camelCase) */
-export type Program = {
-  id: string;
+// Create typed Supabase client
+const supabaseUrl = getSupabaseUrl();
+const supabaseAnonKey = getSupabaseAnonKey();
+
+if (!supabaseUrl) {
+  throw new Error('Supabase URL is not configured. Set VITE_SUPABASE_URL or localStorage SUPABASE_URL.');
+}
+
+const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+
+// Helper types from database
+type StorageFilesRow = Database['public']['Tables']['storage_files_catalog']['Row'];
+type ProgramsRow = Database['public']['Tables']['programs']['Row'];
+type TrainingModulesRow = Database['public']['Tables']['training_modules']['Row'];
+
+// Legacy compatibility types for existing UI components
+export interface StorageFileItem {
+  path: string;
+  url: string;
+  filename: string;
+  title: string;
+  mimeType?: string;
+  size?: number;
+}
+
+export interface ProgramListItem {
   slug: string;
   name: string;
   description?: string | null;
-  overview?: string | null;
-  experienceLevel?: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-};
+}
 
-/** File row (app-level camelCase) */
-export type FileItem = {
-  fileId: string;
-  programId?: string | null;
-  programSlug?: string | null;
-  programName?: string | null;
-  fileName: string;
-  filePath: string;
-  fileUrl: string;
-  mimeType?: string | null;
-  category?: string | null;
-  subcategory?: string | null;
-  contentClass?: string | null;
-  useCase?: string | null;
-  medicalConditions?: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-};
+// Program slugs from database enum
+export const ProgramSlugs = [
+  'mtmthefuturetoday',
+  'timemymeds', 
+  'testandtreat',
+  'hba1c',
+  'oralcontraceptives',
+] as const;
 
-function buildUrl(path: string, params: Record<string, string | undefined> = {}) {
-  const base = getSupabaseUrl();
-  if (!base) throw new Error('Supabase URL is not configured.');
-  const url = new URL(`${base}/rest/v1${path}`);
-  for (const [k, v] of Object.entries(params)) {
-    if (v != null && v !== '') url.searchParams.set(k, v);
+export type ProgramSlug = typeof ProgramSlugs[number];
+
+/**
+ * Convert database file row to legacy StorageFileItem format for UI compatibility
+ */
+function mapFileToStorageItem(file: StorageFilesRow, displayName?: string): StorageFileItem {
+  // Strip file extension for title (legacy behavior)
+  const title = displayName ? displayName.replace(/\.[^/.]+$/, '') : file.file_name.replace(/\.[^/.]+$/, '');
+  
+  return {
+    path: file.id, // Use file ID as path for uniqueness
+    url: file.file_url,
+    filename: file.file_name,
+    title: title,
+    mimeType: file.mime_type || undefined,
+    size: file.file_size || undefined
+  };
+}
+
+/**
+ * Content API - Main service interface using official Supabase client
+ */
+export const contentApi = {
+  /**
+   * Get all programs with basic info
+   */
+  async listPrograms(): Promise<ProgramListItem[]> {
+    try {
+      const { data, error } = await supabase
+        .from('programs')
+        .select('slug, name, description')
+        .order('name');
+
+      if (error) throw error;
+
+      return data.map(program => ({
+        slug: program.slug as ProgramSlug,
+        name: program.name,
+        description: program.description
+      }));
+    } catch (error) {
+      console.error('Failed to fetch programs:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get program resources grouped by use_case (tab content)
+   * Uses storage_files_catalog with program_name filter and use_case grouping
+   */
+  async getProgramResourcesGrouped(programSlug: string): Promise<{
+    forms: StorageFileItem[];
+    protocols: StorageFileItem[];
+    resources: StorageFileItem[];
+    training: StorageFileItem[];
+  }> {
+    try {
+      // Get program info first to get the program_name for filtering
+      const { data: programData, error: programError } = await supabase
+        .from('programs')
+        .select('name')
+        .eq('slug', programSlug)
+        .single();
+
+      if (programError) throw programError;
+
+      // Get all files for this program from storage_files_catalog
+      const { data: files, error: filesError } = await supabase
+        .from('storage_files_catalog')
+        .select('*')
+        .eq('program_name', programData.name)
+        .order('file_name');
+
+      if (filesError) throw filesError;
+
+      // Group files by use_case
+      const grouped = {
+        forms: [] as StorageFileItem[],
+        protocols: [] as StorageFileItem[],
+        resources: [] as StorageFileItem[],
+        training: [] as StorageFileItem[]
+      };
+
+      files.forEach(file => {
+        const item = mapFileToStorageItem(file);
+        
+        // Map use_case to tab categories
+        switch (file.use_case?.toLowerCase()) {
+          case 'forms':
+          case 'documentation':
+            grouped.forms.push(item);
+            break;
+          case 'protocols':
+          case 'protocol':
+            grouped.protocols.push(item);
+            break;
+          case 'training':
+          case 'training modules':
+            grouped.training.push(item);
+            break;
+          case 'resources':
+          case 'additional resources':
+          default:
+            grouped.resources.push(item);
+            break;
+        }
+      });
+
+      return grouped;
+    } catch (error) {
+      console.error(`Failed to get grouped resources for ${programSlug}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get training modules with progress info (joins with training_modules table)
+   */
+  async getTrainingModulesWithProgress(programSlug: string, profileId?: string): Promise<StorageFileItem[]> {
+    try {
+      // Get program ID first
+      const { data: programData, error: programError } = await supabase
+        .from('programs')
+        .select('id')
+        .eq('slug', programSlug)
+        .single();
+
+      if (programError) throw programError;
+
+      // Join training_modules with storage_files_catalog to get file info and sort order
+      const query = supabase
+        .from('training_modules')
+        .select(`
+          id,
+          name,
+          length,
+          sort_order,
+          storage_files_catalog!inner (
+            id,
+            file_name,
+            file_url,
+            mime_type,
+            file_size
+          )
+        `)
+        .eq('program_id', programData.id)
+        .order('sort_order');
+
+      const { data: modules, error: modulesError } = await query;
+
+      if (modulesError) throw modulesError;
+
+      return modules.map(module => 
+        mapFileToStorageItem(module.storage_files_catalog as StorageFilesRow, module.name || undefined)
+      );
+    } catch (error) {
+      console.error(`Failed to get training modules for ${programSlug}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get global category resources (patient handouts, clinical guidelines, medical billing)
+   */
+  async getGlobalCategory(category: 'handouts' | 'guidelines' | 'billing'): Promise<StorageFileItem[]> {
+    try {
+      switch (category) {
+        case 'handouts': {
+          const { data, error } = await supabase
+            .from('patient_handouts')
+            .select(`
+              name,
+              storage_files_catalog!inner (
+                id,
+                file_name,
+                file_url,
+                mime_type,
+                file_size
+              )
+            `)
+            .order('name');
+
+          if (error) throw error;
+
+          return data.map(item => 
+            mapFileToStorageItem(item.storage_files_catalog, item.name)
+          );
+        }
+
+        case 'guidelines': {
+          const { data, error } = await supabase
+            .from('clinical_guidelines')
+            .select(`
+              name,
+              storage_files_catalog!inner (
+                id,
+                file_name,
+                file_url,
+                mime_type,
+                file_size
+              )
+            `)
+            .order('name');
+
+          if (error) throw error;
+
+          return data.map(item => 
+            mapFileToStorageItem(item.storage_files_catalog, item.name)
+          );
+        }
+
+        case 'billing': {
+          const { data, error } = await supabase
+            .from('medical_billing_resources')
+            .select(`
+              name,
+              storage_files_catalog!inner (
+                id,
+                file_name,
+                file_url,
+                mime_type,
+                file_size
+              )
+            `)
+            .order('name');
+
+          if (error) throw error;
+
+          return data.map(item => 
+            mapFileToStorageItem(item.storage_files_catalog, item.name)
+          );
+        }
+
+        default:
+          return [];
+      }
+    } catch (error) {
+      console.error(`Failed to get global category ${category}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Search files across all content with filters
+   */
+  async searchFiles(options: {
+    searchTerm?: string;
+    programName?: string;
+    useCase?: string;
+    category?: string;
+    mimeType?: string;
+  } = {}): Promise<StorageFileItem[]> {
+    try {
+      let query = supabase
+        .from('storage_files_catalog')
+        .select('*');
+
+      // Apply filters
+      if (options.programName) {
+        query = query.eq('program_name', options.programName);
+      }
+      
+      if (options.useCase) {
+        query = query.eq('use_case', options.useCase);
+      }
+      
+      if (options.category) {
+        query = query.eq('form_category', options.category);
+      }
+      
+      if (options.mimeType) {
+        query = query.like('mime_type', `${options.mimeType}%`);
+      }
+      
+      if (options.searchTerm) {
+        query = query.or(`file_name.ilike.%${options.searchTerm}%,program_name.ilike.%${options.searchTerm}%`);
+      }
+
+      query = query.order('file_name');
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      return data.map(file => mapFileToStorageItem(file));
+    } catch (error) {
+      console.error('Failed to search files:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get announcements for dashboard
+   */
+  async getAnnouncements(limit: number = 5): Promise<Array<{
+    id: number;
+    title: string | null;
+    body: string | null;
+    created_at: string;
+  }>> {
+    try {
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('id, title, body, created_at')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+
+      return data;
+    } catch (error) {
+      console.error('Failed to get announcements:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Legacy compatibility: List programs for storage catalog
+   */
+  async listProgramsFromStorage(): Promise<ProgramListItem[]> {
+    return this.listPrograms();
   }
-  return url.toString();
-}
+};
 
-function headers(): Record<string, string> {
-  const anon = getSupabaseAnonKey();
-  if (!anon) throw new Error('Supabase anon key is not configured.');
-  return { apikey: anon, Authorization: `Bearer ${anon}` };
-}
+/**
+ * Legacy exports for backward compatibility
+ */
+export const getProgramResourcesGrouped = contentApi.getProgramResourcesGrouped.bind(contentApi);
+export const listProgramsFromStorage = contentApi.listProgramsFromStorage.bind(contentApi);
+export const getGlobalCategory = contentApi.getGlobalCategory.bind(contentApi);
 
-// SELECT alias strings (camelCase on the right-hand side)
-const PROGRAM_SELECT =
-  'id,slug,name,description,overview,experience_level:experienceLevel,created_at:createdAt,updated_at:updatedAt';
-
-const STORAGE_SELECT = [
-  'id:fileId',
-  'program_id:programId',
-  'file_name:fileName',
-  'file_path:filePath',
-  'file_url:fileUrl',
-  'mime_type:mimeType',
-  'form_category:category',
-  'form_subcategory:subcategory',
-  'content_class:contentClass',
-  'use_case:useCase',
-  'medical_conditions:medicalConditions',
-  'created_at:createdAt',
-  'updated_at:updatedAt',
-].join(',');
-
-export async function listPrograms(): Promise<Program[]> {
-  const url = buildUrl('/programs', { select: PROGRAM_SELECT, order: 'slug.asc' });
-  const res = await fetch(url, { headers: headers() });
-  if (!res.ok) throw new Error(`listPrograms failed (${res.status})`);
-  return (await res.json()) as Program[];
-}
-
-export async function getProgramBySlug(slug: string): Promise<Program | null> {
-  const url = buildUrl('/programs', {
-    select: PROGRAM_SELECT,
-    slug: `eq.${encodeURIComponent(slug)}`,
-    limit: '1',
-  });
-  const res = await fetch(url, { headers: headers() });
-  if (!res.ok) throw new Error(`getProgramBySlug failed (${res.status})`);
-  const rows = (await res.json()) as Program[];
-  return rows?.[0] || null;
-}
-
-type FileFilters = { category?: string; subcategory?: string; q?: string; isVideo?: boolean };
-
-function buildFileQueryParams(filters?: FileFilters): Record<string, string> {
-  const params: Record<string, string> = { select: STORAGE_SELECT, order: 'fileName.asc' };
-  if (!filters) return params;
-  if (filters.category) params['form_category'] = `eq.${filters.category}`;
-  if (filters.subcategory) params['form_subcategory'] = `eq.${filters.subcategory}`;
-  if (filters.q) params['file_name'] = `ilike.%${filters.q}%`;
-  return params;
-}
-
-function applyVideoFilter(rows: FileItem[], isVideo?: boolean): FileItem[] {
-  if (isVideo == null) return rows;
-  const isVid = (m?: string | null) => !!m && m.toLowerCase().startsWith('video/');
-  return rows.filter(r => (isVideo ? isVid(r.mimeType) : !isVid(r.mimeType)));
-}
-
-export async function listFilesByProgramId(programId: string, filters?: FileFilters): Promise<FileItem[]> {
-  const params = buildFileQueryParams(filters);
-  params['program_id'] = `eq.${encodeURIComponent(programId)}`;
-  const url = buildUrl('/storage_files_catalog', params);
-  const res = await fetch(url, { headers: headers() });
-  if (!res.ok) throw new Error(`listFilesByProgramId failed (${res.status})`);
-  const data = (await res.json()) as FileItem[];
-  return applyVideoFilter(data, filters?.isVideo);
-}
-
-export async function listAllFiles(filters?: FileFilters): Promise<FileItem[]> {
-  const params = buildFileQueryParams(filters);
-  const url = buildUrl('/storage_files_catalog', params);
-  const res = await fetch(url, { headers: headers() });
-  if (!res.ok) throw new Error(`listAllFiles failed (${res.status})`);
-  const data = (await res.json()) as FileItem[];
-  return applyVideoFilter(data, filters?.isVideo);
-}
-
-export async function listAnnouncements(): Promise<{ id: number; title: string | null; body: string | null; createdAt: string }[]> {
-  const url = buildUrl('/announcements', { select: 'id,title,body,created_at:createdAt', order: 'created_at.desc' });
-  const res = await fetch(url, { headers: headers() });
-  if (!res.ok) throw new Error(`listAnnouncements failed (${res.status})`);
-  return (await res.json()) as any;
-}
-
-export async function listBookmarks(profileId: string): Promise<{ id: string; profileId: string; resourceId: string; resourceType: string; createdAt: string | null }[]> {
-  const url = buildUrl('/bookmarks', {
-    select: 'id,profile_id:profileId,resource_id:resourceId,resource_type:resourceType,created_at:createdAt',
-    profile_id: `eq.${encodeURIComponent(profileId)}`,
-  });
-  const res = await fetch(url, { headers: headers() });
-  if (!res.ok) throw new Error(`listBookmarks failed (${res.status})`);
-  return (await res.json()) as any;
-}
-
-/** Convenience utility: make a public URL from a FileItem */
-export function publicUrl(file: Pick<FileItem, 'fileUrl'>): string {
-  return file.fileUrl;
-}
+export default contentApi;
