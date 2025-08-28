@@ -30,9 +30,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
  * Roles displayed in the dropdown (label = value).
  */
 const ROLE_OPTIONS: ProfileRole[] = [
+  'Pharmacist',
   'Pharmacist-PIC',
-  'Pharmacist-Staff',
   'Pharmacy Technician',
+  'Intern',
+  'Pharmacy',
 ];
 
 /**
@@ -40,7 +42,7 @@ const ROLE_OPTIONS: ProfileRole[] = [
  * Optional fields accept empty string; if present, they must match a reasonable pattern.
  */
 const schema = z.object({
-  role: z.enum(['Pharmacist-PIC', 'Pharmacist-Staff', 'Pharmacy Technician'], {
+  role: z.enum(['Pharmacist', 'Pharmacist-PIC', 'Pharmacy Technician', 'Intern', 'Pharmacy'], {
     required_error: 'Role is required',
   }),
   firstName: z.string().min(1, 'First Name is required'),
@@ -53,18 +55,6 @@ const schema = z.object({
     .string()
     .optional()
     .refine((v) => !v || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), { message: 'Invalid email' }),
-  dobMonth: z
-    .string()
-    .optional()
-    .refine((v) => !v || /^(0[1-9]|1[0-2])$/.test(v), { message: 'Use two digits (01-12)' }),
-  dobDay: z
-    .string()
-    .optional()
-    .refine((v) => !v || /^(0[1-9]|[12][0-9]|3[01])$/.test(v), { message: 'Use two digits (01-31)' }),
-  dobYear: z
-    .string()
-    .optional()
-    .refine((v) => !v || /^(19|20)\d{2}$/.test(v), { message: 'Use four digits (YYYY)' }),
   licenseNumber: z.string().optional(),
   nabpEProfileId: z.string().optional(),
 });
@@ -116,9 +106,6 @@ export default function AddProfileModal({
       lastName: defaultValues?.lastName || '',
       phone: defaultValues?.phone || '',
       email: defaultValues?.email || '',
-      dobMonth: defaultValues?.dobMonth || '',
-      dobDay: defaultValues?.dobDay || '',
-      dobYear: defaultValues?.dobYear || '',
       licenseNumber: defaultValues?.licenseNumber || '',
       nabpEProfileId: defaultValues?.nabpEProfileId || '',
     },
@@ -136,9 +123,6 @@ export default function AddProfileModal({
         lastName: defaultValues?.lastName || '',
         phone: defaultValues?.phone || '',
         email: defaultValues?.email || '',
-        dobMonth: defaultValues?.dobMonth || '',
-        dobDay: defaultValues?.dobDay || '',
-        dobYear: defaultValues?.dobYear || '',
         licenseNumber: defaultValues?.licenseNumber || '',
         nabpEProfileId: defaultValues?.nabpEProfileId || '',
       });
@@ -161,9 +145,6 @@ export default function AddProfileModal({
           lastName: values.lastName,
           phone: values.phone || undefined,
           email: values.email || undefined,
-          dobMonth: values.dobMonth || undefined,
-          dobDay: values.dobDay || undefined,
-          dobYear: values.dobYear || undefined,
           licenseNumber: values.licenseNumber || undefined,
           nabpEProfileId: values.nabpEProfileId || undefined,
         });
@@ -246,42 +227,6 @@ export default function AddProfileModal({
               <Input id="email" type="email" placeholder="user@example.com" {...register('email')} />
               {errors.email && <p className="text-sm text-red-600">{errors.email.message}</p>}
             </div>
-          </div>
-
-          {/* DOB */}
-          <div className="space-y-2">
-            <Label>Date of Birth</Label>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-1">
-                <Input
-                  placeholder="MM"
-                  maxLength={2}
-                  {...register('dobMonth')}
-                />
-                <p className="text-xs text-gray-500">Month</p>
-              </div>
-              <div className="space-y-1">
-                <Input
-                  placeholder="DD"
-                  maxLength={2}
-                  {...register('dobDay')}
-                />
-                <p className="text-xs text-gray-500">Day</p>
-              </div>
-              <div className="space-y-1">
-                <Input
-                  placeholder="YYYY"
-                  maxLength={4}
-                  {...register('dobYear')}
-                />
-                <p className="text-xs text-gray-500">Year</p>
-              </div>
-            </div>
-            {(errors.dobMonth || errors.dobDay || errors.dobYear) && (
-              <p className="text-sm text-red-600">
-                {errors.dobMonth?.message || errors.dobDay?.message || errors.dobYear?.message}
-              </p>
-            )}
           </div>
 
           {/* License + NABP */}
