@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "node scripts/build.mjs",
-    "build": "node scripts/build.mjs --production"
+    "build": "node scripts/build.mjs --production",
+    "guard": "node scripts/ci-guard.mjs",
+    "prebuild": "node scripts/ci-guard.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",

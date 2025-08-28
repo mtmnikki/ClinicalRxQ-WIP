@@ -1,7 +1,7 @@
 /**
  * Dashboard page with Supabase integration
  * - Uses real data from Supabase via dashboardApi service
- * - No mock data or Airtable references
+ * - No mock data references
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
