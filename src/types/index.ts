@@ -68,7 +68,6 @@ export interface PharmacyProfile {
   nabpEProfileId?: string;
   
   // System fields
-  is_active: boolean;
   createdAt: string;
   updatedAt: string;
 }
