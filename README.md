@@ -142,6 +142,10 @@ The authentication system uses a layered architecture with Supabase GoTrue as th
 - Comprehensive error handling at each layer
 - Full TypeScript type safety
 
+### Selected Profile
+Users can have multiple profiles. The interface refers to the active one as the **Selected** profile. The database field `is_active`
+is reserved for soft-delete semantics and should not appear in UI wording.
+
 ## 📡 API Integration
 
 ### Supabase Configuration
@@ -167,168 +171,22 @@ The authentication system uses a layered architecture with Supabase GoTrue as th
 - `POST /object/list/{bucket}` - List files
 - `GET /object/public/{bucket}/{path}` - Public file URLs
 
-## 📁 Content Delivery System
+## 📁 Content API
 
-The content system serves clinical program materials through a sophisticated multi-layer architecture:
+Program and resource data are loaded from Supabase using `src/services/contentApi.ts`. Each PostgREST request specifies
+`SELECT` aliases so responses return camelCase keys even though the underlying columns remain snake_case.
 
-### 1. Core Content Service Files
+### Key functions
 
-#### **`src/services/storageCatalog.ts` - Main Content Service**
-- **Primary Function**: `getProgramResourcesGrouped(slug: ProgramSlug)`
-- **Content Categories**: `forms`, `protocols`, `resources`, `training`
-- **Data Sources**:
-  - Primary: `storage_files_catalog` PostgreSQL table
-  - Fallback: Direct Supabase Storage REST API
-- **Supported Programs**:
-  ```typescript
-  const ProgramSlugs = [
-    'mtmthefuturetoday',    // MTM The Future Today
-    'timemymeds',           // TimeMyMeds
-    'testandtreat',         // Test & Treat Services
-    'hba1c',                // HbA1c Testing
-    'oralcontraceptives'    // Oral Contraceptives
-  ];
-  ```
+- `listPrograms()` – fetch all programs ordered by slug.
+- `getProgramBySlug(slug)` – retrieve a single program.
+- `listFilesByProgramId(programId, opts)` – files for a program with optional filters (`category`, `subcategory`, `q`, `isVideo`).
+- `listAllFiles(opts)` – global file search with the same filters.
+- `listAnnouncements()` – list announcements ordered by creation date.
+- `listBookmarks(profileId)` – bookmarks for a specific profile.
 
-#### **`src/services/supabaseStorage.ts` - Storage Layer**
-- **Key Functions**:
-  - `listAllForProgram(programSlug)` - Fallback content loader
-  - `listProgramCategory(programSlug, category)` - Category-specific lists
-  - `buildPublicUrl(path)` - Generates downloadable file URLs
-- **File Processing**:
-  - Strips file extensions for display titles
-  - Handles MIME type detection
-  - Creates public download links
-
-### 2. Database/Storage Integration
-
-#### **Database Tables**
-- **`storage_files_catalog`** (Primary data source):
-  ```sql
-  SELECT * FROM storage_files_catalog 
-  WHERE bucket_name = 'clinicalrxqfiles' 
-  AND file_path ILIKE '{programSlug}/{category}/%'
-  ORDER BY file_path ASC
-  ```
-
-- **Supabase Storage Bucket**: `clinicalrxqfiles`
-  - Direct file storage with public URLs
-  - Organized folder structure: `{programSlug}/{category}/filename.ext`
-
-#### **`src/config/supabaseConfig.ts` - Configuration**
-- Supabase URL and API key management
-- Environment variables with localStorage overrides
-- REST API configuration for PostgREST queries
-
-### 3. UI Component Files
-
-#### **`src/components/resources/ProgramResourceRow.tsx` - Content Display**
-- Individual file row component with:
-  - File type icons (PDF, video, spreadsheet, etc.)
-  - Play/Download buttons based on content type
-  - Video duration extraction from filenames
-  - Responsive hover effects
-
-#### **`src/pages/ProgramDetail.tsx` - Main Page Component**
-- **URL Route**: `/program/:programSlug`
-- **Tab Structure**: Overview, Training, Protocols, Forms, Resources
-- **Special Features**:
-  - Collapsible sections for MTM forms (4 categories)
-  - Nested subsections for Prescriber Communication
-  - Test & Treat forms organized by condition (COVID, Flu, Strep)
-  - URL-synced tab navigation (`?tab=forms`)
-
-### 4. Routing & Navigation
-
-#### **`src/App.tsx` - Route Configuration**
-```typescript
-<Route 
-  path="/program/:programSlug" 
-  element={<ProtectedRoute><ProgramDetail /></ProtectedRoute>} 
-/>
-```
-
-#### **`src/pages/MemberContent.tsx` - Program List**
-- Lists available programs with links to ProgramDetail
-- Data source: `listProgramsFromStorage()` from storageCatalog
-- Creates navigation links like `/program/mtmthefuturetoday`
-
-### 5. Content Organization Flow
-
-```
-┌─────────────────────┐    ┌──────────────────────┐    ┌─────────────────────┐
-│   ProgramDetail     │───▶│   storageCatalog     │───▶│ storage_files_catalog│
-│   (UI Page)         │    │   (Content Service)  │    │   (Database Table)   │
-└─────────────────────┘    └──────────────────────┘    └─────────────────────┘
-           │                           │                           │
-           ▼                           ▼                           ▼
-┌─────────────────────┐    ┌──────────────────────┐    ┌─────────────────────┐
-│ ProgramResourceRow  │    │  supabaseStorage     │    │ Supabase Storage    │
-│ (File Display)      │    │  (Storage API)       │    │ (File Bucket)       │
-└─────────────────────┘    └──────────────────────┘    └─────────────────────┘
-```
-
-### 6. Content Structure in Storage
-
-```
-clinicalrxqfiles/
-├── mtmthefuturetoday/
-│   ├── forms/
-│   │   ├── utilityforms/          # General Forms
-│   │   ├── medflowsheets/         # Medical Conditions Flowsheets
-│   │   ├── outcomestip/           # Outcomes TIP Forms
-│   │   └── prescribercomm/        # Prescriber Communication
-│   │       ├── druginteractions/
-│   │       ├── needsdrugtherapy/
-│   │       ├── optimizemedicationtherapy/
-│   │       └── suboptimaldrugselection_hrm/
-│   ├── protocols/                 # Protocol Manuals
-│   ├── training/                  # Training Modules
-│   └── resources/                 # Additional Resources
-├── testandtreat/
-│   └── forms/
-│       ├── covid/                 # COVID Forms
-│       ├── flu/                   # Flu Forms
-│       └── strep/                 # Strep Forms
-├── timemymeds/
-├── hba1c/
-└── oralcontraceptives/
-```
-
-### 7. Special Content Features
-
-#### **MTM Forms Organization**
-- **4-Level Hierarchy**: Main sections with collapsible subsections
-- **Prescriber Communication**: Nested 5-part organization
-  - General, Drug Interactions, Needs Drug Therapy, Optimize Medication, Suboptimal/High Risk
-- **Smart Categorization**: Automatic folder-based organization
-
-#### **Test & Treat Forms**
-- **Condition-Based**: COVID, Flu, Strep sections
-- **Collapsible Interface**: Default collapsed with smooth animations
-
-#### **Content Type Handling**
-- **Video Content**: Automatic duration extraction and play buttons
-- **Document Files**: Download buttons with appropriate icons
-- **File Type Detection**: Smart icons (PDF, Excel, Word, generic)
-- **Public URLs**: Direct download/view links for all content
-
-### 8. Performance & Reliability
-
-#### **Data Source Strategy**
-- **Primary**: Database catalog for fast queries and metadata
-- **Fallback**: Direct storage listing for reliability
-- **Caching**: Browser-level caching of API responses
-
-#### **Error Handling**
-- Graceful fallback from database to storage API
-- User-friendly error messages for missing content
-- Loading states during content fetching
-
-#### **Scalability**
-- PostgREST queries with efficient indexing
-- Public CDN-style URLs for file delivery
-- Lazy loading of content sections
+`FileItem` objects include metadata such as `fileName`, `fileUrl`, `category`, `contentClass`, `useCase`, and `medicalConditions`.
+Clients detect videos by checking `mimeType?.toLowerCase().startsWith('video/')`.
 
 ## 🔧 Development Guidelines
 

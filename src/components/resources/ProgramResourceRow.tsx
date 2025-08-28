@@ -16,13 +16,28 @@ import {
   FileText,
   Play,
 } from 'lucide-react';
-import type { StorageFileItem } from '../../services/supabaseStorage';
-import {
-  isDoc,
-  isPdf,
-  isSpreadsheet,
-  isVideo,
-} from '../../services/supabaseStorage';
+import type { FileItem } from '../../services/contentApi';
+
+function isVideo(item: FileItem): boolean {
+  const mime = (item.mimeType || '').toLowerCase();
+  if (mime.startsWith('video/')) return true;
+  const lower = item.fileName.toLowerCase();
+  return lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.m4v') || lower.endsWith('.webm');
+}
+
+function isPdf(item: FileItem): boolean {
+  return item.fileName.toLowerCase().endsWith('.pdf');
+}
+
+function isSpreadsheet(item: FileItem): boolean {
+  const lower = item.fileName.toLowerCase();
+  return lower.endsWith('.xls') || lower.endsWith('.xlsx') || lower.endsWith('.csv');
+}
+
+function isDoc(item: FileItem): boolean {
+  const lower = item.fileName.toLowerCase();
+  return lower.endsWith('.doc') || lower.endsWith('.docx');
+}
 
 /**
  * Infer a duration label from the filename or title, if present.
@@ -36,7 +51,7 @@ function inferDurationLabel(name: string): string | undefined {
 /**
  * Choose a brand-colored icon for a given file type
  */
-function BrandFileIcon({ item }: { item: StorageFileItem }) {
+function BrandFileIcon({ item }: { item: FileItem }) {
   const cls = 'h-5 w-5 text-blue-600'; // Brand color
   if (isVideo(item)) return <Play className={cls} />;
   if (isSpreadsheet(item)) return <FileSpreadsheet className={cls} />;
@@ -69,10 +84,10 @@ function normalizeForCompare(s: string): string {
 /**
  * ProgramResourceRow component
  */
-export default function ProgramResourceRow({ item }: { item: StorageFileItem }) {
+export default function ProgramResourceRow({ item }: { item: FileItem }) {
   const video = isVideo(item);
-  const title = item.title || item.filename || '';
-  const filename = item.filename || '';
+  const title = stripOneExtension(item.fileName);
+  const filename = item.fileName;
   const duration = video ? inferDurationLabel(title) : undefined;
 
   // Determine whether to show the subtitle (filename).
@@ -106,14 +121,14 @@ export default function ProgramResourceRow({ item }: { item: StorageFileItem }) 
           ) : null}
 
           {video ? (
-            <a href={item.url} target="_blank" rel="noreferrer">
+            <a href={item.fileUrl} target="_blank" rel="noreferrer">
               <Button className="h-8 px-3">
                 <Play className="mr-2 h-4 w-4" />
                 Play
               </Button>
             </a>
           ) : (
-            <a href={item.url} target="_blank" rel="noreferrer">
+            <a href={item.fileUrl} target="_blank" rel="noreferrer">
               <Button className="h-8 px-3">
                 <Download className="mr-2 h-4 w-4" />
                 Download

@@ -1,277 +1,72 @@
-/** 
- * ProgramDetail page (Supabase-only, storage_files_catalog backed)
- * - Purpose: Display a single clinical program by slug with grouped resources:
- *   Overview, Training Modules, Protocol Manuals, Documentation Forms, Additional Resources.
- * - Data: Supabase Storage via storageCatalog.getProgramResourcesGrouped (no Airtable).
- * - Layout: Blue→cyan gradient hero with glassmorphism container, then a horizontal Tabs nav.
- * - UX: Dense, full-width rows using ProgramResourceRow inside each tab; URL sync via ?tab=.
- * - Update: MTM forms (Forms tab) are sectioned and now collapsible (collapsed by default) with smooth transitions.
- * - New: Prescriber Communication Forms are further split into collapsible subsections (collapsed by default):
- *   General, Drug Interactions, Needs Drug Therapy, Optimize Medication Therapy, Suboptimal Drug Selection/High Risk Medication.
- * - New (this update): Test & Treat forms are separated into collapsible sections: COVID, Flu, Strep.
+/**
+ * ProgramDetail page backed by Supabase tables.
+ * Displays a single program with grouped resources.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useLocation, useNavigate, Link } from 'react-router';
+import { useParams, useLocation, useNavigate } from 'react-router';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { Button } from '../components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
-import { ChevronDown, ChevronRight, LibraryBig } from 'lucide-react';
+import { LibraryBig } from 'lucide-react';
 import Breadcrumbs from '../components/common/Breadcrumbs';
 import SafeText from '../components/common/SafeText';
 import AppShell from '../components/layout/AppShell';
 import MemberSidebar from '../components/layout/MemberSidebar';
 import ProgramResourceRow from '../components/resources/ProgramResourceRow';
-import {
-  getProgramResourcesGrouped,
-  ProgramSlugs,
-  listProgramsFromStorage,
-  type ProgramSlug,
-} from '../services/storageCatalog';
-import type { StorageFileItem } from '../services/supabaseStorage';
+import { getProgramBySlug, listFilesByProgramId, type FileItem, type Program } from '../services/contentApi';
 
-/**
- * Tab identifiers for the ProgramDetail page
- */
+/** Tab identifiers */
 type ProgramTab = 'overview' | 'training' | 'protocols' | 'forms' | 'resources';
 
-/**
- * Normalize a query param value to a valid ProgramTab, or fallback to 'overview'.
- */
 function normalizeTab(v: string | null | undefined): ProgramTab {
   const val = (v || '').toLowerCase();
-  if (val === 'training' || val === 'protocols' || val === 'forms' || val === 'resources') return val;
-  return 'overview';
+  return val === 'training' || val === 'protocols' || val === 'forms' || val === 'resources' ? val : 'overview';
 }
 
-/**
- * Sort items by display title then filename.
- */
-function sortByTitle(a: StorageFileItem, b: StorageFileItem): number {
-  const at = (a.title || a.filename || '').toLowerCase();
-  const bt = (b.title || b.filename || '').toLowerCase();
-  if (at < bt) return -1;
-  if (at > bt) return 1;
-  return (a.filename || '').localeCompare(b.filename || '');
-}
-
-/**
- * Section definition for MTM forms.
- */
-interface SectionDef {
-  key: 'general' | 'flowsheets' | 'outcomes' | 'prescriber';
-  label: string;
-  match: string[]; // lowercased path substrings to match
-}
-
-/**
- * Curated MTM section map (case-insensitive path matching).
- */
-const MTM_SECTIONS: SectionDef[] = [
-  { key: 'general', label: 'General Forms', match: ['/forms/utilityforms/'] },
-  { key: 'flowsheets', label: 'Medical Conditions Flowsheets', match: ['/forms/medflowsheets/'] },
-  { key: 'outcomes', label: 'Outcomes TIP Forms', match: ['/forms/outcomestip/'] },
-  { key: 'prescriber', label: 'Prescriber Communication Forms', match: ['/forms/prescribercomm/'] },
-];
-
-/**
- * Prescriber Communication subsections (case-insensitive matching).
- * - Note: "General" is calculated as remaining items not matching any specific subfolder.
- */
-type PrescriberKey =
-  | 'general'
-  | 'drugInteractions'
-  | 'needsDrugTherapy'
-  | 'optimizeMedication'
-  | 'suboptimalHighRisk';
-
-interface PrescriberSubDef {
-  key: Exclude<PrescriberKey, 'general'>;
-  label: string;
-  match: string[];
-}
-
-/** Folder matchers for prescriber subfolders (lowercased, lenient) */
-const PRESCRIBER_SUBFOLDERS: PrescriberSubDef[] = [
-  {
-    key: 'drugInteractions',
-    label: 'Drug Interactions',
-    match: ['/forms/prescribercomm/druginteractions/'],
-  },
-  {
-    key: 'needsDrugTherapy',
-    label: 'Needs Drug Therapy',
-    match: ['/forms/prescribercomm/needsdrugtherapy/'],
-  },
-  {
-    key: 'optimizeMedication',
-    label: 'Optimize Medication Therapy',
-    match: ['/forms/prescribercomm/optimizemedicationtherapy/'],
-  },
-  {
-    key: 'suboptimalHighRisk',
-    label: 'Suboptimal Drug Selection/ High Risk Medication',
-    match: [
-      '/forms/prescribercomm/suboptimaldrugselection_hrm/',
-      '/forms/prescribercomm/suboptimaldrugselection/', // lenient fallback
-    ],
-  },
-];
-
-/**
- * Return true if a file path matches any of the substrings.
- */
-function pathMatches(path: string, substrings: string[]): boolean {
-  const p = (path || '').toLowerCase();
-  return substrings.some((s) => p.includes(s));
-}
-
-/**
- * Build sectioned lists for MTM forms based on folder structure.
- * - Any unmatched items are excluded from the four curated sections.
- * - Returns only sections that have items.
- */
-function buildMtmFormSections(
-  items: StorageFileItem[]
-): Array<{ key: SectionDef['key']; label: string; items: StorageFileItem[] }> {
-  const bySection = MTM_SECTIONS.map((s) => ({
-    key: s.key,
-    label: s.label,
-    items: items
-      .filter((it) => pathMatches(it.path || '', s.match))
-      .slice()
-      .sort(sortByTitle),
-  }));
-  return bySection.filter((s) => s.items.length > 0);
-}
-
-/**
- * Build Prescriber Communication subsections:
- * - Splits the given prescriber items into 5 groups:
- *   Drug Interactions, Needs Drug Therapy, Optimize Medication Therapy, Suboptimal/HRM, and General (remaining).
- * - Only returns non-empty groups.
- */
-function buildPrescriberSubsections(
-  items: StorageFileItem[]
-): Array<{ key: PrescriberKey; label: string; items: StorageFileItem[] }> {
-  const lowerPath = (s: string) => (s || '').toLowerCase();
-
-  // 1) Compute explicit subfolder groups
-  const buckets: Record<Exclude<PrescriberKey, 'general'>, StorageFileItem[]> = {
-    drugInteractions: [],
-    needsDrugTherapy: [],
-    optimizeMedication: [],
-    suboptimalHighRisk: [],
-  };
-
-  const matched = new Set<string>();
-  for (const item of items) {
-    const p = lowerPath(item.path);
-    let placed = false;
-    for (const sub of PRESCRIBER_SUBFOLDERS) {
-      if (pathMatches(p, sub.match)) {
-        buckets[sub.key].push(item);
-        matched.add(item.path);
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) {
-      // Will be considered under "General" later
-    }
-  }
-
-  // 2) General = items not matched by any explicit subfolder
-  const general: StorageFileItem[] = items.filter((i) => !matched.has(i.path));
-
-  // 3) Assemble, sorting each
-  const out: Array<{ key: PrescriberKey; label: string; items: StorageFileItem[] }> = [];
-
-  // General first
-  if (general.length > 0) {
-    out.push({
-      key: 'general',
-      label: 'General',
-      items: general.slice().sort(sortByTitle),
-    });
-  }
-
-  // Then explicit groups in the curated order
-  for (const sub of PRESCRIBER_SUBFOLDERS) {
-    const arr = buckets[sub.key].slice().sort(sortByTitle);
-    if (arr.length > 0) {
-      out.push({ key: sub.key, label: sub.label, items: arr });
-    }
-  }
-
-  return out;
-}
-
-/**
- * NEW: Test & Treat section definitions
- */
-type TntSectionKey = 'covid' | 'flu' | 'strep';
-
-interface TntSectionDef {
-  key: TntSectionKey;
-  label: string;
-  match: string[];
-}
-
-/** Curated TnT section matchers (case-insensitive) */
-const TNT_SECTIONS: TntSectionDef[] = [
-  { key: 'covid', label: 'COVID', match: ['/forms/covid/'] },
-  { key: 'flu', label: 'Flu', match: ['/forms/flu/'] },
-  { key: 'strep', label: 'Strep', match: ['/forms/strep/'] },
-];
-
-/**
- * Build Test & Treat (TnT) sections based on folder structure.
- * - Returns only sections that have items.
- */
-function buildTntFormSections(
-  items: StorageFileItem[]
-): Array<{ key: TntSectionKey; label: string; items: StorageFileItem[] }> {
-  const grouped = TNT_SECTIONS.map((s) => ({
-    key: s.key,
-    label: s.label,
-    items: items
-      .filter((it) => pathMatches(it.path || '', s.match))
-      .slice()
-      .sort(sortByTitle),
-  }));
-  return grouped.filter((g) => g.items.length > 0);
-}
-
-/**
- * ProgramDetail page component (tabbed, dense layout)
- */
 export default function ProgramDetail() {
-  const { programSlug = '' } = useParams();
-  const [name, setName] = useState<string>(programSlug);
-  const [description, setDescription] = useState<string | undefined>(undefined);
-
-  const [training, setTraining] = useState<StorageFileItem[]>([]);
-  const [protocols, setProtocols] = useState<StorageFileItem[]>([]);
-  const [forms, setForms] = useState<StorageFileItem[]>([]);
-  const [resources, setResources] = useState<StorageFileItem[]>([]);
-
+  const { programSlug } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [program, setProgram] = useState<Program | null>(null);
+  const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // URL tab sync
-  const location = useLocation();
-  const navigate = useNavigate();
+  const currentTab = normalizeTab(new URLSearchParams(location.search).get('tab'));
 
-  const currentTab: ProgramTab = useMemo(() => {
-    const qs = new URLSearchParams(location.search);
-    return normalizeTab(qs.get('tab'));
-  }, [location.search]);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!programSlug) return;
+      try {
+        setLoading(true);
+        setErr(null);
+        const prog = await getProgramBySlug(programSlug);
+        if (!prog) {
+          navigate('/member-content');
+          return;
+        }
+        if (cancelled) return;
+        setProgram(prog);
+        const rows = await listFilesByProgramId(prog.id);
+        if (!cancelled) setFiles(rows);
+      } catch (e: any) {
+        if (!cancelled) setErr(e.message || 'Failed to load program');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [programSlug, navigate]);
 
-  /**
-   * Count helpers for quick labels
-   */
+  const training = useMemo(() => files.filter((f) => f.category?.toLowerCase() === 'training'), [files]);
+  const protocols = useMemo(() => files.filter((f) => f.category?.toLowerCase() === 'protocols'), [files]);
+  const forms = useMemo(() => files.filter((f) => f.category?.toLowerCase() === 'forms'), [files]);
+  const resources = useMemo(() => files.filter((f) => f.category?.toLowerCase() === 'resources'), [files]);
   const counts = {
     training: training.length,
     protocols: protocols.length,
@@ -279,370 +74,52 @@ export default function ProgramDetail() {
     resources: resources.length,
   };
 
-  /**
-   * Collapsible state for MTM forms sections (default: collapsed)
-   */
-  const [mtmOpen, setMtmOpen] = useState<{
-    general: boolean;
-    flowsheets: boolean;
-    outcomes: boolean;
-    prescriber: boolean;
-  }>({
-    general: false,
-    flowsheets: false,
-    outcomes: false,
-    prescriber: false,
-  });
-
-  /**
-   * Collapsible state for MTM Prescriber subsections (default: collapsed)
-   */
-  const [mtmPrescOpen, setMtmPrescOpen] = useState<{
-    general: boolean;
-    drugInteractions: boolean;
-    needsDrugTherapy: boolean;
-    optimizeMedication: boolean;
-    suboptimalHighRisk: boolean;
-  }>({
-    general: false,
-    drugInteractions: false,
-    needsDrugTherapy: false,
-    optimizeMedication: false,
-    suboptimalHighRisk: false,
-  });
-
-  /**
-   * NEW: Collapsible state for Test & Treat sections (default: collapsed)
-   */
-  const [tntOpen, setTntOpen] = useState<{
-    covid: boolean;
-    flu: boolean;
-    strep: boolean;
-  }>({
-    covid: false,
-    flu: false,
-    strep: false,
-  });
-
-  /**
-   * Toggle a specific MTM section open/closed
-   * @param key - Section key to toggle
-   */
-  function toggleMtmSection(key: SectionDef['key']) {
-    setMtmOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  function handleTabChange(v: ProgramTab) {
+    const params = new URLSearchParams(location.search);
+    params.set('tab', v);
+    navigate({ search: params.toString() }, { replace: true });
   }
 
-  /**
-   * Toggle a specific Prescriber subsection open/closed
-   * @param key - Subsection key to toggle
-   */
-  function toggleMtmPrescriber(key: PrescriberKey) {
-    setMtmPrescOpen((prev) => ({ ...prev, [key]: !prev[key] }));
-  }
-
-  /**
-   * NEW: Toggle a specific Test & Treat section open/closed
-   * @param key - TnT section key to toggle
-   */
-  function toggleTntSection(key: TntSectionKey) {
-    setTntOpen((prev) => ({ ...prev, [key]: !prev[key] }));
-  }
-
-  /**
-   * Load metadata + grouped files from Supabase storage_files_catalog
-   */
-  useEffect(() => {
-    let mounted = true;
-
-    async function load() {
-      try {
-        setLoading(true);
-        setErr(null);
-
-        // Friendly name/description from curated list
-        try {
-          const list = await listProgramsFromStorage();
-          const meta = list.find((p) => p.slug === programSlug);
-          if (mounted) {
-            setName(meta?.name || programSlug);
-            setDescription(meta?.description || undefined);
-          }
-        } catch {
-          if (mounted) {
-            setName(programSlug);
-            setDescription(undefined);
-          }
-        }
-
-        // Only load grouped files if slug is recognized
-        if ((ProgramSlugs as readonly string[]).includes(programSlug)) {
-          const grouped = await getProgramResourcesGrouped(programSlug as ProgramSlug);
-          if (!mounted) return;
-          setTraining(grouped.training || []);
-          setProtocols(grouped.protocols || []);
-          setForms(grouped.forms || []);
-          setResources(grouped.resources || []);
-        } else {
-          throw new Error('Program not found.');
-        }
-      } catch (e: any) {
-        if (mounted) setErr(e?.message || 'Failed to load program.');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [programSlug]);
-
-  /**
-   * Handle tab change by writing it into the URL (?tab=...)
-   */
-  function handleTabChange(next: string) {
-    const tab = normalizeTab(next);
-    const qs = new URLSearchParams(location.search);
-    qs.set('tab', tab);
-    navigate({ pathname: location.pathname, search: qs.toString() }, { replace: false });
-  }
-
-  /**
-   * Render list rows for a group, or an empty state (dense style)
-   */
-  function renderRows(items: StorageFileItem[], emptyHint: string) {
-    if (items.length === 0) {
-      return (
-        <div className="rounded-md border border-dashed bg-white p-6 text-center text-sm text-slate-600">
-          {emptyHint}
-        </div>
-      );
+  function renderRows(items: FileItem[], empty: string) {
+    if (!items.length) {
+      return <div className="rounded-md border p-6 text-sm text-slate-600">{empty}</div>;
     }
     return (
       <div className="space-y-3">
-        {items.map((i) => (
-          <ProgramResourceRow key={i.path} item={i} />
+        {items.map((item) => (
+          <ProgramResourceRow key={item.fileId} item={item} />
         ))}
       </div>
     );
   }
 
-  /**
-   * Render the Prescriber Communication subsections as nested collapsibles.
-   * - Default collapsed; smooth transitions using max-height.
-   * - Only shown when the Prescriber section is open.
-   */
-  function renderPrescriberSubsections(items: StorageFileItem[]) {
-    const subs = buildPrescriberSubsections(items);
-    if (subs.length === 0) {
-      return renderRows(items, 'No prescriber communication forms available yet.');
-    }
+  if (!programSlug) return null;
 
-    return (
-      <div className="space-y-3">
-        {subs.map((sub) => {
-          const open = mtmPrescOpen[sub.key as PrescriberKey];
-          const panelId = `mtm-presc-${sub.key}`;
-          return (
-            <div key={sub.key} className="rounded-md border bg-white">
-              {/* Subsection header */}
-              <button
-                type="button"
-                className="relative flex w-full items-center justify-between px-3 py-2 text-left rounded-t-md bg-gradient-to-r from-blue-600/10 via-cyan-500/10 to-transparent hover:from-blue-600/15 hover:via-cyan-500/15 hover:to-transparent transition-colors"
-                aria-expanded={open}
-                aria-controls={panelId}
-                onClick={() => toggleMtmPrescriber(sub.key)}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-cyan-600" aria-hidden />
-                  <h4 className="text-sm font-semibold text-slate-800">
-                    {sub.label}{' '}
-                    <span className="ml-1 text-xs font-normal text-slate-500">({sub.items.length})</span>
-                  </h4>
-                </div>
-                <div className="text-slate-500">
-                  {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </div>
-              </button>
-
-              {/* Subsection collapsible content */}
-              <div
-                id={panelId}
-                aria-hidden={!open}
-                className={[
-                  'overflow-hidden px-3',
-                  open ? 'max-h-[100000px] py-3' : 'max-h-0',
-                  'transition-[max-height] duration-300 ease-in-out',
-                ].join(' ')}
-              >
-                <div className="space-y-3">
-                  {sub.items.map((i) => (
-                    <ProgramResourceRow key={i.path} item={i} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  /**
-   * Render MTM The Future Today forms as four sections with headers and counts.
-   * - Sections: General Forms, Medical Conditions Flowsheets, Outcomes TIP Forms, Prescriber Communication Forms.
-   * - Collapsible: Each section is collapsed by default; toggled open on header click.
-   * - New: Prescriber section contains nested collapsible subsections (default: collapsed).
-   */
-  function renderMtmForms(items: StorageFileItem[]) {
-    const sections = buildMtmFormSections(items);
-    if (sections.length === 0) {
-      return renderRows(items, 'No documentation forms available yet.');
-    }
-
-    return (
-      <div className="space-y-4">
-        {sections.map((section) => {
-          const open = mtmOpen[section.key];
-          const panelId = `mtm-${section.key}`;
-          return (
-            <div key={section.key} className="rounded-md border bg-white">
-              {/* Header */}
-              <button
-                type="button"
-                className="relative flex w-full items-center justify-between px-3 py-2 text-left rounded-t-md bg-gradient-to-r from-cyan-600/10 via-teal-500/10 to-transparent hover:from-cyan-600/15 hover:via-teal-500/15 hover:to-transparent transition-colors"
-                aria-expanded={open}
-                aria-controls={panelId}
-                onClick={() => toggleMtmSection(section.key)}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-600" aria-hidden />
-                  <h3 className="text-sm font-semibold text-slate-800">
-                    {section.label}{' '}
-                    <span className="ml-1 text-xs font-normal text-slate-500">({section.items.length})</span>
-                  </h3>
-                </div>
-                <div className="text-slate-500">
-                  {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </div>
-              </button>
-
-              {/* Collapsible content with smooth max-height transition */}
-              <div
-                id={panelId}
-                aria-hidden={!open}
-                className={[
-                  'overflow-hidden px-3',
-                  open ? 'py-3' : 'max-h-0',
-                  'transition-[max-height] duration-300 ease-in-out',
-                ].join(' ')}
-              >
-                {/* For Prescriber section, render nested subsections; else render flat rows */}
-                {section.key === 'prescriber' ? (
-                  renderPrescriberSubsections(section.items)
-                ) : (
-                  <div className="space-y-3">
-                    {section.items.map((i) => (
-                      <ProgramResourceRow key={i.path} item={i} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  /**
-   * NEW: Render Test & Treat forms as three sections with headers and counts.
-   * - Sections: COVID, Flu, Strep.
-   * - Collapsible: Each section is collapsed by default; toggled open on header click.
-   */
-  function renderTntForms(items: StorageFileItem[]) {
-    const sections = buildTntFormSections(items);
-    if (sections.length === 0) {
-      return renderRows(items, 'No documentation forms available yet.');
-    }
-
-    return (
-      <div className="space-y-4">
-        {sections.map((section) => {
-          const open = tntOpen[section.key];
-          const panelId = `tnt-${section.key}`;
-          return (
-            <div key={section.key} className="rounded-md border bg-white">
-              {/* Header */}
-              <button
-                type="button"
-                className="relative flex w-full items-center justify-between px-3 py-2 text-left rounded-t-md bg-gradient-to-r from-cyan-600/10 via-teal-500/10 to-transparent hover:from-cyan-600/15 hover:via-teal-500/15 hover:to-transparent transition-colors"
-                aria-expanded={open}
-                aria-controls={panelId}
-                onClick={() => toggleTntSection(section.key)}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-600" aria-hidden />
-                  <h3 className="text-sm font-semibold text-slate-800">
-                    {section.label}{' '}
-                    <span className="ml-1 text-xs font-normal text-slate-500">({section.items.length})</span>
-                  </h3>
-                </div>
-                <div className="text-slate-500">
-                  {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </div>
-              </button>
-
-              {/* Collapsible content with smooth max-height transition (large to avoid clipping) */}
-              <div
-                id={panelId}
-                aria-hidden={!open}
-                className={[
-                  'overflow-hidden px-3',
-                  open ? 'max-h-[100000px] py-3' : 'max-h-0',
-                  'transition-[max-height] duration-300 ease-in-out',
-                ].join(' ')}
-              >
-                <div className="space-y-3">
-                  {section.items.map((i) => (
-                    <ProgramResourceRow key={i.path} item={i} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
+  const { name = '', description } = program || {};
 
   return (
-    <AppShell sidebar={<MemberSidebar />}>
-      {/* Gradient hero with glass container */}
-      <section className="relative -mx-3 bg-gradient-to-br from-blue-700 via-cyan-500 to-teal-400 px-4 py-10 text-white">
-        <div className="mx-auto w-full">
-          <div className="w-full max-w-none">
-            <Breadcrumbs
-              variant="light"
-              items={[
-                { label: 'Dashboard', to: '/dashboard' },
-                { label: 'Clinical Programs', to: '/member-content' },
-                { label: name || 'Program' },
-              ]}
-              className="mb-4"
-            />
-
-            {/* Glassmorphism container */}
-            <div className="w-full max-w-5xl mx-auto rounded-xl border border-white/35 bg-white/20 p-6 shadow-lg backdrop-blur-md">
+    <AppShell>
+      <MemberSidebar />
+      <Breadcrumbs
+        items={[
+          { label: 'Home', path: '/dashboard' },
+          { label: 'Programs', path: '/member-content' },
+          { label: name || programSlug, path: `/program/${programSlug}` },
+        ]}
+      />
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-cyan-500 to-teal-300 py-10 text-white">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center gap-3">
+            <LibraryBig className="h-8 w-8" />
+            <div>
               <h1 className="text-3xl font-bold leading-tight">
                 <SafeText value={name} />
               </h1>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {!loading ? (
-                <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
+                  <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
                     {counts.training} training • {counts.protocols} protocols • {counts.forms} forms • {counts.resources} resources
-                </Badge>
+                  </Badge>
                 ) : null}
               </div>
               {description ? (
@@ -655,7 +132,6 @@ export default function ProgramDetail() {
         </div>
       </section>
 
-      {/* Loading or error */}
       <section className="py-6">
         {loading ? (
           <div className="rounded-md border p-6 text-sm text-slate-600">Loading program…</div>
@@ -663,7 +139,6 @@ export default function ProgramDetail() {
           <div className="rounded-md border border-red-200 bg-red-50 p-6 text-sm text-red-700">{err}</div>
         ) : (
           <div className="space-y-6">
-            {/* Tabs nav */}
             <Card className="overflow-hidden">
               <div className="h-1 bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-300" />
               <CardContent className="p-0">
@@ -688,7 +163,6 @@ export default function ProgramDetail() {
                     </TabsList>
                   </div>
 
-                  {/* Overview */}
                   <TabsContent value="overview" className="px-4 py-4">
                     <div className="space-y-4">
                       {description ? (
@@ -697,12 +171,10 @@ export default function ProgramDetail() {
                         </p>
                       ) : (
                         <p className="text-sm text-slate-600">
-                          This program includes training modules, protocols, documentation forms, and additional
-                          resources.
+                          This program includes training modules, protocols, documentation forms, and additional resources.
                         </p>
                       )}
 
-                      {/* Compact summary blocks */}
                       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                         <div className="rounded-md border bg-white p-3 text-center text-sm">
                           <div className="text-2xl font-semibold text-slate-900">{counts.training}</div>
@@ -724,26 +196,18 @@ export default function ProgramDetail() {
                     </div>
                   </TabsContent>
 
-                  {/* Training */}
                   <TabsContent value="training" className="px-4 py-4">
                     {renderRows(training, 'No training modules available yet.')}
                   </TabsContent>
 
-                  {/* Protocols */}
                   <TabsContent value="protocols" className="px-4 py-4">
                     {renderRows(protocols, 'No protocol manuals available yet.')}
                   </TabsContent>
 
-                  {/* Forms */}
                   <TabsContent value="forms" className="px-4 py-4">
-                    {programSlug === 'mtmthefuturetoday'
-                      ? renderMtmForms(forms)
-                      : programSlug === 'testandtreat'
-                      ? renderTntForms(forms)
-                      : renderRows(forms, 'No documentation forms available yet.')}
+                    {renderRows(forms, 'No documentation forms available yet.')}
                   </TabsContent>
 
-                  {/* Additional Resources */}
                   <TabsContent value="resources" className="px-4 py-4">
                     {renderRows(resources, 'No additional resources available yet.')}
                   </TabsContent>

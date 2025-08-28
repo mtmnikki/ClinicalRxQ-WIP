@@ -2,7 +2,7 @@
  * Member Content page (Programs listing, Supabase-only)
  * - Purpose: Show available programs discovered from Supabase tables.
  * - Layout: AppShell with MemberSidebar (consistent member frame).
- * - Data: DB-backed contentApi (no Airtable, no storageCatalog).
+ * - Data: DB-backed contentApi.
  */
 
 import { useEffect, useMemo, useState } from 'react';

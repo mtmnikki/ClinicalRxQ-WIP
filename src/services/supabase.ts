@@ -357,9 +357,12 @@ export const bookmarkService = {
     return [];
   },
   async addBookmark(resourceType: string, resourceId: string) {
+    const session = await authService.getSession();
+    const userId = session?.user?.id;
+    if (!userId) throw new Error('Not authenticated');
     return {
       id: crypto.randomUUID(),
-      user_id: 'mock-user',
+      user_id: userId,
       resource_type: resourceType,
       resource_id: resourceId,
       created_at: new Date().toISOString(),
