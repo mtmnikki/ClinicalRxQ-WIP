@@ -10,14 +10,10 @@ import { Badge } from '../components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { ChevronDown, ChevronRight, LibraryBig } from 'lucide-react';
 import Breadcrumbs from '../components/common/Breadcrumbs';
-import SafeText, { default as SafeTextProps } from '../components/common/SafeText';
+import SafeText from '../components/common/SafeText';
 import AppShell from '../components/layout/AppShell';
 import MemberSidebar from '../components/layout/MemberSidebar';
 import ProgramResourceRow from '../components/resources/ProgramResourceRow';
-
-// ✂️ REMOVE these two lines if present:
-// import type { StorageFileItem } from '../services/supabaseStorage';
-// import { stripOneExtension } from '../services/supabaseStorage';
 
 import { getProgramBySlug, listFilesByProgramId, type FileItem } from '../services/contentApi';
 

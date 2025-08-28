@@ -1,5 +1,5 @@
 /**
- * DB-backed content API (PostgREST). Replaces legacy storageCatalog/staticCatalog.
+ * DB-backed content API (PostgREST).
  * - Uses SELECT aliases so app-level keys are camelCase while DB stays snake_case.
  * - Fetches via Supabase REST with anon key; server enforces RLS.
  */
@@ -18,7 +18,7 @@ export type Program = {
   updatedAt: string | null;
 };
 
-/** File row from storage_files_catalog (app-level camelCase) */
+/** File row (app-level camelCase) */
 export type FileItem = {
   fileId: string;
   programId?: string | null;

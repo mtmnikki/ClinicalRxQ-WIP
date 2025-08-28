@@ -1,7 +1,7 @@
-/** 
- * Resource Library — DB-backed (storage_files_catalog) via Content API.
- * Replaces legacy storageCatalog usage. Uses FileItem types end-to-end.
- * Filters: q (filename), category, subcategory, isVideo (client/server), cond (medical conditions contains).
+/**
+ * Resource Library — DB-backed (PostgREST) via Content API.
+ * Uses FileItem end-to-end with server-side filters and a client-side
+ * medical-conditions filter for convenience.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -53,7 +53,6 @@ export default function Resources() {
   const [err, setErr] = useState<string | null>(null);
   const [rows, setRows] = useState<FileItem[]>([]);
 
-  // Fetch whenever the core server-side filters change
   useEffect(() => {
     let mounted = true;
     async function load() {
@@ -108,11 +107,9 @@ export default function Resources() {
       arr.push(r);
       map.set(k, arr);
     }
-    // Sort each group by fileName
     for (const [k, arr] of map) {
       arr.sort((a, b) => (a.fileName || '').localeCompare(b.fileName || ''));
     }
-    // Sort groups by key
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [filtered]);
 
