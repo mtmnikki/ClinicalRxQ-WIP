@@ -50,7 +50,7 @@ export interface Resource {
 }
 
 // Profile system types
-export type ProfileRole = 'Pharmacist-PIC' | 'Pharmacist-Staff' | 'Pharmacy Technician';
+export type ProfileRole = 'Pharmacist' | 'Pharmacist-PIC' | 'Pharmacy Technician' | 'Intern' | 'Admin' | 'Pharmacy' | null;
 
 export interface PharmacyProfile {
   id: string;
@@ -64,9 +64,6 @@ export interface PharmacyProfile {
   // Optional fields
   phone?: string;
   email?: string;
-  dobMonth?: string; // "01"-"12"
-  dobDay?: string;   // "01"-"31" 
-  dobYear?: string;  // "1950"-"2010"
   licenseNumber?: string;
   nabpEProfileId?: string;
   
@@ -82,9 +79,6 @@ export interface CreateProfileData {
   lastName: string;
   phone?: string;
   email?: string;
-  dobMonth?: string;
-  dobDay?: string;
-  dobYear?: string;
   licenseNumber?: string;
   nabpEProfileId?: string;
 }
