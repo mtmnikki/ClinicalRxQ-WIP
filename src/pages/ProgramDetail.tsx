@@ -1,6 +1,6 @@
 /**
- * ProgramDetail page backed by Supabase tables.
- * Displays a single program with grouped resources.
+ * ProgramDetail page — DB-backed (storage_files_catalog) via Content API.
+ * Uses Content API FileItem types (no StorageFileItem).
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -8,215 +8,343 @@ import { useParams, useLocation, useNavigate } from 'react-router';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
-import { LibraryBig } from 'lucide-react';
+import { ChevronDown, ChevronRight, LibraryBig } from 'lucide-react';
 import Breadcrumbs from '../components/common/Breadcrumbs';
-import SafeText from '../components/common/SafeText';
+import SafeText, { default as SafeTextProps } from '../components/common/SafeText';
 import AppShell from '../components/layout/AppShell';
 import MemberSidebar from '../components/layout/MemberSidebar';
 import ProgramResourceRow from '../components/resources/ProgramResourceRow';
-import { getProgramBySlug, listFilesByProgramId, type FileItem, type Program } from '../services/contentApi';
 
-/** Tab identifiers */
+// ✂️ REMOVE these two lines if present:
+// import type { StorageFileItem } from '../services/supabaseStorage';
+// import { stripOneExtension } from '../services/supabaseStorage';
+
+import { getProgramBySlug, listFilesByProgramId, type FileItem } from '../services/contentApi';
+
 type ProgramTab = 'overview' | 'training' | 'protocols' | 'forms' | 'resources';
 
-function normalizeTab(v: string | null | undefined): ProgramTab {
-  const val = (v || '').toLowerCase();
-  return val === 'training' || val === 'protocols' || val === 'forms' || val === 'resources' ? val : 'overview';
+function normalizeTab(v?: string | null): ProgramTab {
+  const t = String(v || '').toLowerCase();
+  return (['overview', 'training', 'protocols', 'forms', 'resources'] as const).includes(t as ProgramTab)
+    ? (t as ProgramTab)
+    : 'overview';
 }
 
+/** Heuristics to bucket a file into a tab, using filePath and category/class. */
+function inferBucket(f: FileItem): ProgramTab {
+  const p = (f.filePath || '').toLowerCase();
+  const cat = (f.category || '').toLowerCase();
+  const cls = (f.contentClass || '').toLowerCase();
+
+  if (p.includes('/training/') || cat.startsWith('training') || cls === 'training') return 'training';
+  if (p.includes('/protocol') || cat.startsWith('protocol') || cls === 'protocol') return 'protocols';
+  if (p.includes('/forms/') || cat.startsWith('form') || cls === 'forms') return 'forms';
+  return 'resources';
+}
+
+/** Collapse helpers for MTM/Test&Treat (driven by folder names in filePath) */
+type SectionDef = { key: string; label: string; match: string[] };
+
+const MTM_SECTIONS: SectionDef[] = [
+  { key: 'general', label: 'General Forms', match: ['/forms/utilityforms/'] },
+  { key: 'flowsheets', label: 'Medical Conditions Flowsheets', match: ['/forms/medflowsheets/'] },
+  { key: 'outcomes', label: 'Outcomes TIP Forms', match: ['/forms/outcomestip/'] },
+  { key: 'prescriber', label: 'Prescriber Communication Forms', match: ['/forms/prescribercomm/'] },
+];
+
+type PrescriberKey = 'general' | 'interactions' | 'needsDrugTherapy' | 'optimizeMedication' | 'suboptimalHighRisk';
+
+const MTM_PRESCRIBER_SECTIONS: SectionDef[] = [
+  { key: 'interactions', label: 'Drug Interactions', match: ['/forms/prescribercomm/druginteractions/'] },
+  { key: 'needsDrugTherapy', label: 'Needs Drug Therapy', match: ['/forms/prescribercomm/needsdrugtherapy/'] },
+  { key: 'optimizeMedication', label: 'Optimize Medication Therapy', match: ['/forms/prescribercomm/optimizemedicationtherapy/'] },
+  { key: 'suboptimalHighRisk', label: 'Suboptimal Drug Selection/ High Risk Medication', match: ['/forms/prescribercomm/suboptimaldrugselection_hrm/','/forms/prescribercomm/suboptimaldrugselection/'] },
+];
+
+const TNT_SECTIONS: SectionDef[] = [
+  { key: 'covid', label: 'COVID', match: ['/forms/test&treat/covid/'] },
+  { key: 'flu', label: 'Flu', match: ['/forms/test&treat/flu/'] },
+  { key: 'strep', label: 'Strep', match: ['/forms/test&treat/strep/'] },
+];
+
 export default function ProgramDetail() {
-  const { programSlug } = useParams();
+  const { programSlug = '' } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const [program, setProgram] = useState<Program | null>(null);
-  const [files, setFiles] = useState<FileItem[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const currentTab = normalizeTab(new URLSearchParams(location.search).get('tab'));
+  const [name, setName] = useState<string>(programSlug);
+  const [description, setDescription] = useState<string | undefined>(undefined);
+
+  // 👇 Use FileItem arrays instead of StorageFileItem
+  const [training, setTraining] = useState<FileItem[]>([]);
+  const [protocols, setProtocols] = useState<FileItem[]>([]);
+  const [forms, setForms] = useState<FileItem[]>([]);
+  const [resources, setResources] = useState<FileItem[]>([]);
+
+  const [mtmOpen, setMtmOpen] = useState<Record<string, boolean>>({});
+  const [mtmPrescOpen, setMtmPrescOpen] = useState<Record<string, boolean>>({});
+  const [tntOpen, setTntOpen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    let cancelled = false;
+    let mounted = true;
     async function load() {
-      if (!programSlug) return;
       try {
         setLoading(true);
         setErr(null);
-        const prog = await getProgramBySlug(programSlug);
-        if (!prog) {
-          navigate('/member-content');
-          return;
-        }
-        if (cancelled) return;
-        setProgram(prog);
-        const rows = await listFilesByProgramId(prog.id);
-        if (!cancelled) setFiles(rows);
+
+        const program = await getProgramBySlug(programSlug);
+        if (!program) throw new Error('Program not found.');
+        if (!mounted) return;
+        setName(program.name || programSlug);
+        setDescription(program.description || undefined);
+
+        const rows = await listFilesByProgramId(program.id);
+        if (!mounted) return;
+
+        const bucketed: Record<ProgramTab, FileItem[]> = {
+          overview: [] as FileItem[],
+          training: [] as FileItem[],
+          protocols: [] as FileItem[],
+          forms: [] as FileItem[],
+          resources: [] as FileItem[],
+        };
+        for (const r of rows) bucketed[inferBucket(r)].push(r);
+
+        setTraining(bucketed.training);
+        setProtocols(bucketed.protocols);
+        setForms(bucketed.forms);
+        setResources(bucketed.resources);
       } catch (e: any) {
-        if (!cancelled) setErr(e.message || 'Failed to load program');
+        if (mounted) setErr(e?.message || 'Failed to load program.');
       } finally {
-        if (!cancelled) setLoading(false);
+        if (mounted) setLoading(false);
       }
     }
     load();
-    return () => {
-      cancelled = true;
-    };
-  }, [programSlug, navigate]);
+    return () => { mounted = false; };
+  }, [programSlug]);
 
-  const training = useMemo(() => files.filter((f) => f.category?.toLowerCase() === 'training'), [files]);
-  const protocols = useMemo(() => files.filter((f) => f.category?.toLowerCase() === 'protocols'), [files]);
-  const forms = useMemo(() => files.filter((f) => f.category?.toLowerCase() === 'forms'), [files]);
-  const resources = useMemo(() => files.filter((f) => f.category?.toLowerCase() === 'resources'), [files]);
-  const counts = {
-    training: training.length,
-    protocols: protocols.length,
-    forms: forms.length,
-    resources: resources.length,
-  };
-
-  function handleTabChange(v: ProgramTab) {
-    const params = new URLSearchParams(location.search);
-    params.set('tab', v);
-    navigate({ search: params.toString() }, { replace: true });
+  function handleTabChange(next: string) {
+    const tab = normalizeTab(next);
+    const qs = new URLSearchParams(location.search);
+    qs.set('tab', tab);
+    navigate({ pathname: location.pathname, search: qs.toString() }, { replace: false });
   }
 
-  function renderRows(items: FileItem[], empty: string) {
-    if (!items.length) {
-      return <div className="rounded-md border p-6 text-sm text-slate-600">{empty}</div>;
-    }
-    return (
-      <div className="space-y-3">
-        {items.map((item) => (
-          <ProgramResourceRow key={item.fileId} item={item} />
-        ))}
-      </div>
-    );
-  }
+  const activeTab: ProgramTab = normalizeTab(new URLSearchParams(location.search).get('tab'));
+  const lower = (s: string) => s.toLowerCase();
 
-  if (!programSlug) return null;
+  // 🔁 Update path references to filePath
+  const mtmSections = useMemo(() => {
+    const formsLower = forms.map(f => ({ f, p: lower(f.filePath) }));
+    const sec = MTM_SECTIONS.map(s => ({
+      key: s.key,
+      label: s.label,
+      items: formsLower.filter(x => s.match.some(m => x.p.includes(lower(m)))).map(x => x.f),
+    }));
 
-  const { name = '', description } = program || {};
+    const prescFiles = formsLower.filter(x => x.p.includes('/forms/prescribercomm/'));
+    const presc = MTM_PRESCRIBER_SECTIONS.map(s => ({
+      key: s.key,
+      label: s.label,
+      items: prescFiles.filter(x => s.match.some(m => x.p.includes(lower(m)))).map(x => x.f),
+    }));
+    const unionSpecific = new Set(presc.flatMap(p => p.items.map(i => i.filePath)));
+    const general = prescFiles.filter(x => !unionSpecific.has(x.f.filePath)).map(x => x.f);
+
+    return { sec, presc, prescGeneral: general };
+  }, [forms]);
+
+  const tntSections = useMemo(() => {
+    const formsLower = forms.map(f => ({ f, p: lower(f.filePath) }));
+    const grouped = TNT_SECTIONS.map(s => ({
+      key: s.key,
+      label: s.label,
+      items: formsLower.filter(x => s.match.some(m => x.p.includes(lower(m)))).map(x => x.f),
+    }));
+    return grouped.filter(g => g.items.length > 0);
+  }, [forms]);
 
   return (
-    <AppShell>
-      <MemberSidebar />
-      <Breadcrumbs
-        items={[
-          { label: 'Home', path: '/dashboard' },
-          { label: 'Programs', path: '/member-content' },
-          { label: name || programSlug, path: `/program/${programSlug}` },
-        ]}
-      />
-      <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-cyan-500 to-teal-300 py-10 text-white">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center gap-3">
-            <LibraryBig className="h-8 w-8" />
-            <div>
-              <h1 className="text-3xl font-bold leading-tight">
-                <SafeText value={name} />
-              </h1>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {!loading ? (
-                  <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
-                    {counts.training} training • {counts.protocols} protocols • {counts.forms} forms • {counts.resources} resources
-                  </Badge>
+    <AppShell sidebar={<MemberSidebar />}>
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        <Breadcrumbs
+          items={[
+            { label: 'Member Home', to: '/member' },
+            { label: 'Programs', to: '/member/programs' },
+            { label: name, to: `/member/programs/${programSlug}` },
+          ]}
+        />
+
+        <div className="mt-4 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 p-[1px] shadow">
+          <div className="rounded-2xl bg-white/90 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold text-slate-900">{name}</h1>
+                {description ? (
+                  <p className="mt-1 max-w-3xl text-sm text-slate-600"><SafeText value={description || ""}></SafeText></p>
                 ) : null}
               </div>
-              {description ? (
-                <p className="mt-3 max-w-3xl text-sm text-white">
-                  <SafeText value={description} />
-                </p>
-              ) : null}
+              <div className="hidden md:block">
+                <Badge className="bg-blue-600">Clinical Program</Badge>
+              </div>
             </div>
           </div>
         </div>
-      </section>
 
-      <section className="py-6">
-        {loading ? (
-          <div className="rounded-md border p-6 text-sm text-slate-600">Loading program…</div>
-        ) : err ? (
-          <div className="rounded-md border border-red-200 bg-red-50 p-6 text-sm text-red-700">{err}</div>
-        ) : (
-          <div className="space-y-6">
-            <Card className="overflow-hidden">
-              <div className="h-1 bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-300" />
-              <CardContent className="p-0">
-                <Tabs value={currentTab} onValueChange={handleTabChange}>
-                  <div className="sticky top-0 z-20 border-b bg-white/80 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-                    <TabsList className="h-9">
-                      <TabsTrigger value="overview" className="text-sm">
-                        Overview
-                      </TabsTrigger>
-                      <TabsTrigger value="training" className="text-sm">
-                        Training {counts.training ? `(${counts.training})` : ''}
-                      </TabsTrigger>
-                      <TabsTrigger value="protocols" className="text-sm">
-                        Protocols {counts.protocols ? `(${counts.protocols})` : ''}
-                      </TabsTrigger>
-                      <TabsTrigger value="forms" className="text-sm">
-                        Forms {counts.forms ? `(${counts.forms})` : ''}
-                      </TabsTrigger>
-                      <TabsTrigger value="resources" className="text-sm">
-                        Additional Resources {counts.resources ? `(${counts.resources})` : ''}
-                      </TabsTrigger>
-                    </TabsList>
-                  </div>
+        <div className="mt-6">
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
+            <TabsList className="grid grid-cols-5">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="training">Training Modules</TabsTrigger>
+              <TabsTrigger value="protocols">Protocol Manuals</TabsTrigger>
+              <TabsTrigger value="forms">Documentation Forms</TabsTrigger>
+              <TabsTrigger value="resources">Additional Resources</TabsTrigger>
+            </TabsList>
 
-                  <TabsContent value="overview" className="px-4 py-4">
-                    <div className="space-y-4">
-                      {description ? (
-                        <p className="text-sm text-slate-700">
-                          <SafeText value={description} />
-                        </p>
-                      ) : (
-                        <p className="text-sm text-slate-600">
-                          This program includes training modules, protocols, documentation forms, and additional resources.
-                        </p>
-                      )}
+            <TabsContent value="overview">
+              <Card><CardContent className="py-6">
+                <div className="flex items-center gap-3 text-slate-700">
+                  <LibraryBig className="h-5 w-5" />
+                  <span>Choose a tab to explore training, protocols, forms, and resources for this program.</span>
+                </div>
+              </CardContent></Card>
+            </TabsContent>
 
-                      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                        <div className="rounded-md border bg-white p-3 text-center text-sm">
-                          <div className="text-2xl font-semibold text-slate-900">{counts.training}</div>
-                          <div className="text-slate-600">Training</div>
+            <TabsContent value="training">
+              <div className="space-y-2">
+                {training.map((it) => (
+                  <ProgramResourceRow key={it.fileId ?? it.filePath} item={it} />
+                ))}
+                {training.length === 0 ? <div className="text-sm text-slate-500">No training modules yet.</div> : null}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="protocols">
+              <div className="space-y-2">
+                {protocols.map((it) => (
+                  <ProgramResourceRow key={it.fileId ?? it.filePath} item={it} />
+                ))}
+                {protocols.length === 0 ? <div className="text-sm text-slate-500">No protocol manuals yet.</div> : null}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="forms">
+              <div className="space-y-4">
+                {MTM_SECTIONS.map((sec) => {
+                  const open = !!mtmOpen[sec.key];
+                  const items = mtmSections.sec.find(s => s.key === sec.key)?.items || [];
+                  return (
+                    <div key={sec.key} className="rounded-md border bg-white">
+                      <button
+                        className="flex w-full items-center justify-between px-4 py-3 text-left"
+                        onClick={() => setMtmOpen((prev) => ({ ...prev, [sec.key]: !open }))}
+                      >
+                        <span className="font-medium text-slate-900">{sec.label}</span>
+                        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </button>
+                      {open ? (
+                        <div className="border-t p-3 space-y-2">
+                          {items.map((it) => (
+                            <ProgramResourceRow key={it.fileId ?? it.filePath} item={it} />
+                          ))}
+                          {items.length === 0 ? <div className="text-sm text-slate-500 px-1">No forms in this section.</div> : null}
                         </div>
-                        <div className="rounded-md border bg-white p-3 text-center text-sm">
-                          <div className="text-2xl font-semibold text-slate-900">{counts.protocols}</div>
-                          <div className="text-slate-600">Protocols</div>
-                        </div>
-                        <div className="rounded-md border bg-white p-3 text-center text-sm">
-                          <div className="text-2xl font-semibold text-slate-900">{counts.forms}</div>
-                          <div className="text-slate-600">Forms</div>
-                        </div>
-                        <div className="rounded-md border bg-white p-3 text-center text-sm">
-                          <div className="text-2xl font-semibold text-slate-900">{counts.resources}</div>
-                          <div className="text-slate-600">Resources</div>
-                        </div>
-                      </div>
+                      ) : null}
                     </div>
-                  </TabsContent>
+                  );
+                })}
 
-                  <TabsContent value="training" className="px-4 py-4">
-                    {renderRows(training, 'No training modules available yet.')}
-                  </TabsContent>
+                {/* Prescriber Communication */}
+                <div className="rounded-md border bg-white">
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <span className="font-medium text-slate-900">Prescriber Communication</span>
+                  </div>
+                  <div className="border-t">
+                    {(['interactions','needsDrugTherapy','optimizeMedication','suboptimalHighRisk'] as PrescriberKey[]).map((key) => {
+                      const open = !!mtmPrescOpen[key];
+                      const label = MTM_PRESCRIBER_SECTIONS.find(s => s.key === key)?.label || key;
+                      const items = (key === 'general')
+                        ? mtmSections.prescGeneral
+                        : (mtmSections.presc.find(s => s.key === key)?.items || []);
+                      return (
+                        <div key={key} className="border-t first:border-t-0">
+                          <button
+                            className="flex w-full items-center justify-between px-4 py-3 text-left"
+                            onClick={() => setMtmPrescOpen((prev) => ({ ...prev, [key]: !open }))}
+                          >
+                            <span className="text-sm font-medium text-slate-900">{label}</span>
+                            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </button>
+                          {open ? (
+                            <div className="border-t p-3 space-y-2">
+                              {items.map((it) => (
+                                <ProgramResourceRow key={it.fileId ?? it.filePath} item={it} />
+                              ))}
+                              {items.length === 0 ? <div className="text-sm text-slate-500 px-1">None.</div> : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
 
-                  <TabsContent value="protocols" className="px-4 py-4">
-                    {renderRows(protocols, 'No protocol manuals available yet.')}
-                  </TabsContent>
+                {/* Test & Treat */}
+                {tntSections.length ? (
+                  <div className="rounded-md border bg-white">
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <span className="font-medium text-slate-900">Test & Treat</span>
+                    </div>
+                    <div className="border-t">
+                      {tntSections.map((sec) => {
+                        const open = !!tntOpen[sec.key];
+                        return (
+                          <div key={sec.key} className="border-t first:border-t-0">
+                            <button
+                              className="flex w-full items-center justify-between px-4 py-3 text-left"
+                              onClick={() => setTntOpen((prev) => ({ ...prev, [sec.key]: !open }))}
+                            >
+                              <span className="text-sm font-medium text-slate-900">{sec.label}</span>
+                              {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </button>
+                            {open ? (
+                              <div className="border-t p-3 space-y-2">
+                                {sec.items.map((it) => (
+                                  <ProgramResourceRow key={it.fileId ?? it.filePath} item={it} />
+                                ))}
+                                {sec.items.length === 0 ? <div className="text-sm text-slate-500 px-1">None.</div> : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </TabsContent>
 
-                  <TabsContent value="forms" className="px-4 py-4">
-                    {renderRows(forms, 'No documentation forms available yet.')}
-                  </TabsContent>
+            <TabsContent value="resources">
+              <div className="space-y-2">
+                {resources.map((it) => (
+                  <ProgramResourceRow key={it.fileId ?? it.filePath} item={it} />
+                ))}
+                {resources.length === 0 ? <div className="text-sm text-slate-500">No additional resources yet.</div> : null}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
 
-                  <TabsContent value="resources" className="px-4 py-4">
-                    {renderRows(resources, 'No additional resources available yet.')}
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
+        {err ? (
+          <div className="mt-6 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {err}
           </div>
-        )}
-      </section>
+        ) : null}
+      </div>
     </AppShell>
   );
 }
