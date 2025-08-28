@@ -12,9 +12,8 @@ interface AuthState {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
-  register: (userData: { email: string; password: string; firstName?: string; lastName?: string; pharmacyName?: string }) => Promise<boolean>;
   checkAuth: () => Promise<void>;
-  updateProfile: (updates: { firstName?: string; lastName?: string; pharmacyName?: string }) => Promise<boolean>;
+  updateProfile: (updates: { pharmacyName?: string }) => Promise<boolean>;
   clearUserContext: () => void;
 }
 
