@@ -11,14 +11,11 @@ import type { PharmacyProfile, CreateProfileData, ProfileRole } from '../types';
 interface DatabaseProfile {
   id: string;
   member_account_id: string;
-  role_type: ProfileRole;
+  role: ProfileRole;
   first_name: string;
   last_name: string;
   phone_number?: string;
   user_email?: string;
-  dob_month?: string;
-  dob_day?: string;
-  dob_year?: string;
   license_number?: string;
   nabp_eprofile_id?: string;
   is_active: boolean;
@@ -105,9 +102,6 @@ function mapFromDatabase(dbProfile: DatabaseProfile): PharmacyProfile {
     lastName: dbProfile.last_name,
     phone: dbProfile.phone_number || undefined,
     email: dbProfile.user_email || undefined,
-    dobMonth: dbProfile.dob_month || undefined,
-    dobDay: dbProfile.dob_day || undefined,
-    dobYear: dbProfile.dob_year || undefined,
     licenseNumber: dbProfile.license_number || undefined,
     nabpEProfileId: dbProfile.nabp_eprofile_id || undefined,
     is_active: dbProfile.is_active,
@@ -130,9 +124,6 @@ function mapToDatabase(
     last_name: data.lastName,
     phone_number: data.phone || undefined,
     user_email: data.email || undefined,
-    dob_month: data.dobMonth || undefined,
-    dob_day: data.dobDay || undefined,
-    dob_year: data.dobYear || undefined,
     license_number: data.licenseNumber || undefined,
     nabp_eprofile_id: data.nabpEProfileId || undefined,
   };
@@ -190,14 +181,11 @@ export const profileService = {
     // Convert updates to database format
     const dbUpdates: Record<string, any> = {};
     
-    if (updates.role !== undefined) dbUpdates.role_type = updates.role;
+    if (updates.role !== undefined) dbUpdates.role = updates.role;
     if (updates.firstName !== undefined) dbUpdates.first_name = updates.firstName;
     if (updates.lastName !== undefined) dbUpdates.last_name = updates.lastName;
     if (updates.phone !== undefined) dbUpdates.phone_number = updates.phone || null;
     if (updates.email !== undefined) dbUpdates.user_email = updates.email || null;
-    if (updates.dobMonth !== undefined) dbUpdates.dob_month = updates.dobMonth || null;
-    if (updates.dobDay !== undefined) dbUpdates.dob_day = updates.dobDay || null;
-    if (updates.dobYear !== undefined) dbUpdates.dob_year = updates.dobYear || null;
     if (updates.licenseNumber !== undefined) dbUpdates.license_number = updates.licenseNumber || null;
     if (updates.nabpEProfileId !== undefined) dbUpdates.nabp_eprofile_id = updates.nabpEProfileId || null;
 
