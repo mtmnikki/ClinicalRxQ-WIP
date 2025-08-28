@@ -173,26 +173,10 @@ is reserved for soft-delete semantics and should not appear in UI wording.
 
 ## 📁 Content API
 
-<<<<<<< Updated upstream
-Program and resource data are loaded from Supabase using `src/services/contentApi.ts`. Each PostgREST request specifies
-`SELECT` aliases so responses return camelCase keys even though the underlying columns remain snake_case.
-=======
 The content system serves clinical program materials through a modern database-backed architecture:
->>>>>>> Stashed changes
 
 ### Key functions
 
-<<<<<<< Updated upstream
-- `listPrograms()` – fetch all programs ordered by slug.
-- `getProgramBySlug(slug)` – retrieve a single program.
-- `listFilesByProgramId(programId, opts)` – files for a program with optional filters (`category`, `subcategory`, `q`, `isVideo`).
-- `listAllFiles(opts)` – global file search with the same filters.
-- `listAnnouncements()` – list announcements ordered by creation date.
-- `listBookmarks(profileId)` – bookmarks for a specific profile.
-
-`FileItem` objects include metadata such as `fileName`, `fileUrl`, `category`, `contentClass`, `useCase`, and `medicalConditions`.
-Clients detect videos by checking `mimeType?.toLowerCase().startsWith('video/')`.
-=======
 #### **`src/services/contentApi.ts` - Main Content Service**
 - **Primary Function**: `getProgramResourcesGrouped(slug: ProgramSlug)`
 - **Content Categories**: `forms`, `protocols`, `resources`, `training`
@@ -348,7 +332,6 @@ clinicalrxqfiles/
 - PostgREST queries with efficient indexing
 - Public CDN-style URLs for file delivery
 - Lazy loading of content sections
->>>>>>> Stashed changes
 
 ## 🔧 Development Guidelines
 
