@@ -120,11 +120,13 @@ export default function Account() {
               </div>
             </CardContent>
           </Card>
+      </div>
 
       <AddProfileModal
         open={showAddProfile}
         onOpenChange={setShowAddProfile}
       />
+    </div>
     </AppShell>
   );
 }
