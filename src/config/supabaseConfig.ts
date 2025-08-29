@@ -11,10 +11,10 @@
  */
 
  /** Default Supabase URL baked in per user request */
-const DEFAULT_SUPABASE_URL = 'https://xeyfhlmflsibxzjsirav.supabase.co';
+const VITE_SUPABASE_URL = 'https://xeyfhlmflsibxzjsirav.supabase.co';
 
 /** Default publishable anon key baked in per user request */
-const DEFAULT_SUPABASE_ANON_KEY =
+const VITE_SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhleWZobG1mbHNpYnh6anNpcmF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5Mjg5ODQsImV4cCI6MjA2OTUwNDk4NH0._wwYVbBmqX26WpbBnPMuuSmUTGG-XhxDwg8vkUS_n8Y';
 
 /**
@@ -40,7 +40,7 @@ function readLocalStorage(key: string): string | '' {
 export function getSupabaseUrl(): string {
   const envUrl = (import.meta as any)?.env?.VITE_SUPABASE_URL as string | undefined;
   const lsUrl = readLocalStorage('SUPABASE_URL');
-  const url = (envUrl && envUrl.trim()) || (lsUrl && lsUrl.trim()) || DEFAULT_SUPABASE_URL;
+  const url = (envUrl && envUrl.trim()) || (lsUrl && lsUrl.trim()) || VITE_SUPABASE_URL;
   return url.replace(/\/*$/, ''); // strip trailing slashes
 }
 
@@ -51,5 +51,5 @@ export function getSupabaseUrl(): string {
 export function getSupabaseAnonKey(): string {
   const envKey = (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY as string | undefined;
   const lsKey = readLocalStorage('SUPABASE_ANON_KEY');
-  return (envKey && envKey.trim()) || (lsKey && lsKey.trim()) || DEFAULT_SUPABASE_ANON_KEY;
+  return (envKey && envKey.trim()) || (lsKey && lsKey.trim()) || VITE_SUPABASE_ANON_KEY;
 }
