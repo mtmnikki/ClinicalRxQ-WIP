@@ -6,7 +6,7 @@
  * - Update: Improve DASHBOARD button gradient contrast by removing light teal.
  */
 import { useState, useMemo } from 'react';
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Menu, X, User as UserIcon, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';

@@ -6,9 +6,9 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import AppShell from '../components/layout/AppShell';
-import { useAuth } from '../components/auth/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useProfilesStore } from '../stores/profilesStore';
-import { Api } from '../services/dashboardApi';
+import { programsService, dashboardService } from '../lib/supabaseClient';
 import {
   Announcement,
   ClinicalProgram,
@@ -25,7 +25,7 @@ import {
   PlayCircle,
   FileText,
 } from 'lucide-react';
-import { Link } from 'react-router';
+import { Link } from 'react-router-dom';
 import MemberSidebar from '../components/layout/MemberSidebar';
 
 /**
@@ -136,13 +136,21 @@ export default function Dashboard() {
   useEffect(() => {
     let mounted = true;
     async function load() {
+      if (!currentProfile?.profile_id) return;
+      
       try {
         const [p, q, b, a, an] = await Promise.all([
-          Api.getPrograms(),
-          Api.getQuickAccess(),
-          Api.getBookmarkedResources(),
-          Api.getRecentActivity(),
-          Api.getAnnouncements(),
+          programsService.getAll().then(({ data }) => data?.map(prog => ({
+            id: prog.id,
+            name: prog.name,
+            slug: prog.slug,
+            description: prog.description || '',
+            experienceLevel: prog.experience_level || '',
+          })) || []),
+          dashboardService.getQuickAccess().then(({ data }) => data || []),
+          dashboardService.getBookmarkedResources().then(({ data }) => data || []),
+          dashboardService.getRecentActivity(currentProfile.profile_id).then(({ data }) => data || []),
+          dashboardService.getAnnouncements().then(({ data }) => data || []),
         ]);
         if (!mounted) return;
         setPrograms(p);
@@ -159,7 +167,7 @@ export default function Dashboard() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [currentProfile?.profile_id]);
 
   return (
     <AppShell
@@ -221,26 +229,17 @@ export default function Dashboard() {
                 {activity.map((a) => (
                   <div key={a.id} className="flex items-center justify-between py-2">
                     <div>
-                      <div className="text-[13px] font-medium">{a.name}</div>
+                      <div className="text-[13px] font-medium">{a.resource_name}</div>
                       <div className="text-[12px] text-slate-500">
-                        {a.program?.toUpperCase()} • {new Date(a.accessedAtISO).toLocaleString()}
+                        {a.resource_type?.toUpperCase()} • {new Date(a.accessed_at || '').toLocaleString()}
                       </div>
                     </div>
-                    {a.url ? (
-                      <a href={a.url} target="_blank" rel="noreferrer">
-                        <Button size="sm" variant="outline" className="bg-transparent h-8 px-3">
-                          <Download className="mr-2 h-3.5 w-3.5" />
-                          Re-download
-                        </Button>
-                      </a>
-                    ) : (
-                      <Link to="/resources">
-                        <Button size="sm" variant="outline" className="bg-transparent h-8 px-3">
-                          <Download className="mr-2 h-3.5 w-3.5" />
-                          View in Library
-                        </Button>
-                      </Link>
-                    )}
+                    <Link to="/resources">
+                      <Button size="sm" variant="outline" className="bg-transparent h-8 px-3">
+                        <Download className="mr-2 h-3.5 w-3.5" />
+                        View in Library
+                      </Button>
+                    </Link>
                   </div>
                 ))}
               </div>

@@ -9,7 +9,7 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronRight,
@@ -26,7 +26,7 @@ import {
   FileSpreadsheet,
   BookText,
 } from 'lucide-react';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useAuthStore } from '../../stores/authStore';
 import { useProfilesStore } from '../../stores/profilesStore';
 import LogoImage from '../../assets/images/logoimage.svg';

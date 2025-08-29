@@ -9,8 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { User as UserIcon, Settings, CreditCard, Users } from 'lucide-react';
-import { useAuthStore } from '../stores/authStore';
-import { useProfilesStore } from '../stores/profilesStore';
+import { useAuth } from '../contexts/AuthContext';
+import { useProfile } from '../contexts/ProfileContext';
 import SafeText from '../components/common/SafeText';
 import Breadcrumbs from '../components/common/Breadcrumbs';
 import AppShell from '../components/layout/AppShell';
@@ -19,8 +19,8 @@ import ProfilesTable from '../components/profiles/ProfilesTable';
 import AddProfileModal from '../components/profiles/AddProfileModal';
 
 export default function Account() {
-  const { user } = useAuthStore();
-  const { profiles, currentProfileId } = useProfilesStore();
+  const { user } = useAuth();
+  const { activeProfile } = useProfile();
   const [showAddProfile, setShowAddProfile] = React.useState(false);
 
   /** Header renderer for AppShell */
@@ -38,13 +38,11 @@ export default function Account() {
     </div>
   );
 
-  const currentProfile = profiles.find(p => p.id === currentProfileId);
-
   return (
     <AppShell sidebar={<MemberSidebar />} header={header}>
       <div className="space-y-6">
         {/* Current Profile Info */}
-        {currentProfile && (
+        {activeProfile && (
           <Card className="bg-blue-50/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -56,11 +54,11 @@ export default function Account() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-lg">
-                    {currentProfile.firstName} {currentProfile.lastName}
+                    {activeProfile.first_name} {activeProfile.last_name}
                   </p>
-                  <p className="text-blue-700 font-medium">{currentProfile.role}</p>
-                  {currentProfile.email && (
-                    <p className="text-sm text-gray-600">{currentProfile.email}</p>
+                  <p className="text-blue-700 font-medium">{activeProfile.profile_role}</p>
+                  {activeProfile.profile_email && (
+                    <p className="text-sm text-gray-600">{activeProfile.profile_email}</p>
                   )}
                 </div>
                 <Badge variant="default" className="bg-green-100 text-green-700">
@@ -109,7 +107,7 @@ export default function Account() {
                   <label className="mb-2 block text-sm font-medium">Email</label>
                   <input
                     type="email"
-                    value={String((user?.email ?? '') as any)}
+                    value={user?.email ?? ''}
                     className="w-full rounded-md border p-2"
                     readOnly
                   />

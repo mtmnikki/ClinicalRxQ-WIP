@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import {
   Card,
@@ -18,7 +18,10 @@ import Breadcrumbs from '../components/common/Breadcrumbs';
 import SafeText from '../components/common/SafeText';
 import AppShell from '../components/layout/AppShell';
 import MemberSidebar from '../components/layout/MemberSidebar';
-import { programsService, type Program } from '../services/supabaseClient';
+import { programsService } from '../lib/supabaseClient';
+import type { Database } from '../types/database.types';
+
+type Program = Database['public']['Tables']['programs']['Row'];
 
 /**
  * Convert program name to URL slug
@@ -74,7 +77,7 @@ export default function MemberContent() {
           <div className="max-w-4xl">
             <Breadcrumbs
               items={[
-                { label: 'Dashboard', href: '/dashboard' },
+                { label: 'Dashboard', to: '/dashboard' },
                 { label: 'Clinical Programs' },
               ]}
               className="mb-4 text-white/80"
@@ -140,10 +143,10 @@ export default function MemberContent() {
                         )}
                       </div>
                       <CardTitle className="text-xl">
-                        <SafeText text={program.name} />
+                        <SafeText value={program.name} />
                       </CardTitle>
                       <CardDescription className="line-clamp-2">
-                        <SafeText text={program.description || 'Click to view training modules and resources'} />
+                        <SafeText value={program.description || 'Click to view training modules and resources'} />
                       </CardDescription>
                     </CardHeader>
                     <CardContent>

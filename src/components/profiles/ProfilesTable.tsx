@@ -6,46 +6,55 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { useAuthStore } from '../../stores/authStore';
-import { useProfilesStore } from '../../stores/profilesStore';
-import type { PharmacyProfile } from '../../types';
+import { useProfile } from '../../contexts/ProfileContext';
+import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../ui/button';
 import AddProfileModal from './AddProfileModal';
 
 /**
  * Human-readable full name helper.
  */
-function fullName(p: PharmacyProfile) {
-  return `${p.firstName} ${p.lastName}`.trim();
+function fullName(p: any) {
+  return `${p.first_name} ${p.last_name}`.trim();
 }
 
 /**
  * ProfilesTable component
  */
 export default function ProfilesTable() {
-  const { user } = useAuthStore();
-  const { ensureLoaded, profiles, removeProfile, currentProfileId, setCurrentProfile } = useProfilesStore();
+  const { activeProfile, profiles, selectProfile, updateProfile, fetchProfiles, isLoading } = useProfile();
   const [editOpen, setEditOpen] = useState(false);
-  const [editing, setEditing] = useState<PharmacyProfile | null>(null);
+  const [editing, setEditing] = useState<any>(null);
 
   useEffect(() => {
-    if (user?.id) ensureLoaded(user.id);
-  }, [user?.id, ensureLoaded]);
+    fetchProfiles();
+  }, [fetchProfiles]);
 
   const rows = useMemo(() => profiles.slice().sort((a, b) => fullName(a).localeCompare(fullName(b))), [profiles]);
 
-  function handleEdit(p: PharmacyProfile) {
+  function handleEdit(p: any) {
     setEditing(p);
     setEditOpen(true);
   }
 
-  function handleRemove(p: PharmacyProfile) {
-    if (!user?.id) return;
+  async function handleRemove(p: any) {
     const confirmed = window.confirm(`Remove profile "${fullName(p)}"?`);
     if (confirmed) {
-      const removingActive = currentProfileId === p.id;
-      removeProfile(user.id, p.id);
-      // If removed active, current becomes next in store automatically; no further action needed.
+      try {
+        // Delete from database
+        const { error } = await supabase
+          .from('member_profiles')
+          .delete()
+          .eq('profile_id', p.profile_id);
+        
+        if (error) throw error;
+        
+        // Refresh profiles list
+        await fetchProfiles();
+      } catch (error) {
+        console.error('Error removing profile:', error);
+        alert('Failed to remove profile. Please try again.');
+      }
     }
   }
 
@@ -73,42 +82,42 @@ export default function ProfilesTable() {
             </tr>
           ) : (
             rows.map((p) => (
-              <tr key={p.id} className="hover:bg-slate-50/60">
+              <tr key={p.profile_id} className="hover:bg-slate-50/60">
                 <td className="px-3 py-2">{fullName(p)}</td>
-                <td className="px-3 py-2">{p.role}</td>
-                <td className="px-3 py-2">{p.phone || '—'}</td>
-                <td className="px-3 py-2">{p.email || '—'}</td>
-                <td className="px-3 py-2">{p.licenseNumber || '—'}</td>
-                <td className="px-3 py-2">{p.nabpEProfileId || '—'}</td>
+                <td className="px-3 py-2">{p.profile_role}</td>
+                <td className="px-3 py-2">{p.phone_number || '—'}</td>
+                <td className="px-3 py-2">{p.profile_email || '—'}</td>
+                <td className="px-3 py-2">{p.license_number || '—'}</td>
+                <td className="px-3 py-2">{p.nabp_eprofile_id || '—'}</td>
                 <td className="px-3 py-2">
                   <span
                     className={[
                       'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]',
-                      currentProfileId === p.id ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600',
+                      activeProfile?.profile_id === p.profile_id ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600',
                     ].join(' ')}
                   >
                     <span
                       className={[
                         'h-1.5 w-1.5 rounded-full',
-                        currentProfileId === p.id ? 'bg-green-600' : 'bg-slate-400',
+                        activeProfile?.profile_id === p.profile_id ? 'bg-green-600' : 'bg-slate-400',
                       ].join(' ')}
                     />
-                    {currentProfileId === p.id ? 'Selected' : 'Not selected'}
+                    {activeProfile?.profile_id === p.profile_id ? 'Selected' : 'Not selected'}
                   </span>
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex items-center justify-end gap-2">
-                    {currentProfileId !== p.id ? (
+                    {activeProfile?.profile_id !== p.profile_id ? (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 px-2"
-                        onClick={() => setCurrentProfile(p.id)}
+                        className="h-8 px-2 bg-transparent"
+                        onClick={() => selectProfile(p.profile_id)}
                       >
                         Use
                       </Button>
                     ) : null}
-                    <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => handleEdit(p)}>
+                    <Button variant="outline" size="sm" className="h-8 px-2 bg-transparent" onClick={() => handleEdit(p)}>
                       Edit
                     </Button>
                     <Button variant="destructive" size="sm" className="h-8 px-2" onClick={() => handleRemove(p)}>
@@ -126,8 +135,16 @@ export default function ProfilesTable() {
       <AddProfileModal
         open={editOpen}
         onOpenChange={setEditOpen}
-        profileId={editing?.id}
-        defaultValues={editing ?? undefined}
+        profileId={editing?.profile_id}
+        defaultValues={editing ? {
+          role: editing.profile_role,
+          firstName: editing.first_name,
+          lastName: editing.last_name,
+          phone: editing.phone_number,
+          email: editing.profile_email,
+          licenseNumber: editing.license_number,
+          nabpEProfileId: editing.nabp_eprofile_id,
+        } : undefined}
       />
     </div>
   );

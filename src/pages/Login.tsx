@@ -17,7 +17,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
 import { useAuthStore } from '../stores/authStore';
-import { useLocation, useNavigate, Link } from 'react-router';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { ShieldCheck, FileText, ClipboardList, PlayCircle } from 'lucide-react';
 import Header from '../components/layout/Header';
 
