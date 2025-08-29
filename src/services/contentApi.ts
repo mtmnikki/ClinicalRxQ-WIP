@@ -379,4 +379,8 @@ export const getProgramResourcesGrouped = contentApi.getProgramResourcesGrouped.
 export const listProgramsFromStorage = contentApi.listProgramsFromStorage.bind(contentApi);
 export const getGlobalCategory = contentApi.getGlobalCategory.bind(contentApi);
 
+<<<<<<< Updated upstream
 export default contentApi;
+=======
+export default contentApi;
+>>>>>>> Stashed changes
