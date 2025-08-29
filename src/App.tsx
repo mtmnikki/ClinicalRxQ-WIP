@@ -32,6 +32,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Login />;
   }
 
+  return <>{children}</>;
+}
 
 /**
  * App root component
