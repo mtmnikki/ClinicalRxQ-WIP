@@ -114,7 +114,7 @@ function mapFromDatabase(dbProfile: DatabaseProfile): PharmacyProfile {
 function mapToDatabase(
   memberAccountId: string, 
   data: CreateProfileData
-): Omit<DatabaseProfile, 'id' | 'created_at' | 'updated_at' | 'is_active'> {
+): Omit<DatabaseProfile, 'id' | 'created_at' | 'updated_at' > {
   return {
     member_account_id: memberAccountId,
     profile_type: data.role,
@@ -132,7 +132,7 @@ export const profileService = {
    * Get all profiles for a member account
    */
   async getProfilesForAccount(memberAccountId: string): Promise<ApiResponse<PharmacyProfile[]>> {
-    const endpoint = `/member_profiles?member_account_id=eq.${memberAccountId}&is_active=eq.true&order=created_at.asc`;
+    const endpoint = `/member_profiles?member_account_id=eq.${memberAccountId}&order=created_at.asc`;
     const response = await apiCall<DatabaseProfile[]>(endpoint);
     
     if (response.error) {

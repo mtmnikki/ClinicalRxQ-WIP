@@ -1,8 +1,16 @@
-import * as esbuild from 'esbuild'
 import { rimraf } from 'rimraf'
 import stylePlugin from 'esbuild-style-plugin'
 import autoprefixer from 'autoprefixer'
 import tailwindcss from 'tailwindcss'
+import esbuild from 'esbuild';
+
+esbuild.build({
+  entryPoints: ['src/App.tsx'],
+  bundle: true,
+  outfile: 'dist/app.js',
+  loader: { '.tsx': 'tsx', '.ts': 'ts' },
+  target: ['es2020'],
+}).catch(() => process.exit(1));
 
 const args = process.argv.slice(2)
 const isProd = args[0] === '--production'

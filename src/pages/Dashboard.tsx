@@ -161,20 +161,6 @@ export default function Dashboard() {
     };
   }, []);
 
-  /** Compute subscription color chip */
-  const subColor = useMemo(() => {
-    switch (member?.subscriptionStatus) {
-      case 'Active':
-        return 'bg-green-100 text-green-700';
-      case 'Expiring':
-        return 'bg-amber-100 text-amber-700';
-      case 'Expired':
-        return 'bg-blue-100 text-blue-700';
-      default:
-        return 'bg-blue-100 text-blue-700';
-    }
-  }, [member?.subscriptionStatus]);
-
   return (
     <AppShell
       header={
