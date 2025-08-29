@@ -11,7 +11,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuthStore } from '../../stores/authStore';
-import { useProfilesStore } from '../../stores/profilesStore';
+import { useProfile } from '../../contexts/ProfileContext';
 import type { PharmacyProfile, ProfileRole } from '../../types';
 import {
   Dialog,
@@ -85,11 +85,7 @@ export default function AddProfileModal({
   onCreated,
 }: AddProfileModalProps) {
   const { user } = useAuthStore();
-  const { ensureLoaded, addProfile, updateProfile, isSaving, error, clearError } = useProfilesStore();
-
-  useEffect(() => {
-    if (user?.id) ensureLoaded(user.id);
-  }, [user?.id, ensureLoaded]);
+  const { createProfile, updateProfile, isLoading, error } = useProfile();
 
   const {
     register,
@@ -135,24 +131,32 @@ export default function AddProfileModal({
     try {
       if (profileId) {
         // Edit existing profile
-        const success = await updateProfile(user.id, profileId, values);
-        if (!success) return; // Error handled by store
+        const { error } = await updateProfile(profileId, {
+          profile_role: values.role,
+          first_name: values.firstName,
+          last_name: values.lastName,
+          phone_number: values.phone || null,
+          profile_email: values.email || null,
+          license_number: values.licenseNumber || null,
+          nabp_eprofile_id: values.nabpEProfileId || null,
+        });
+        if (error) return; // Error handled by context
       } else {
         // Create new profile
-        const created = await addProfile(user.id, {
-          role: values.role,
-          firstName: values.firstName,
-          lastName: values.lastName,
-          phone: values.phone || undefined,
-          email: values.email || undefined,
-          licenseNumber: values.licenseNumber || undefined,
-          nabpEProfileId: values.nabpEProfileId || undefined,
+        const { profile, error } = await createProfile({
+          profile_role: values.role,
+          first_name: values.firstName,
+          last_name: values.lastName,
+          phone_number: values.phone || null,
+          profile_email: values.email || null,
+          license_number: values.licenseNumber || null,
+          nabp_eprofile_id: values.nabpEProfileId || null,
         });
         
-        if (created) {
-          onCreated?.(created.id);
+        if (profile) {
+          onCreated?.(profile.profile_id);
         } else {
-          return; // Error handled by store
+          return; // Error handled by context
         }
       }
 
@@ -253,15 +257,15 @@ export default function AddProfileModal({
               type="button" 
               variant="outline" 
               onClick={() => onOpenChange(false)}
-              disabled={isSaving}
+              disabled={isLoading}
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
-              disabled={isSubmitting || isSaving}
+              disabled={isSubmitting || isLoading}
             >
-              {(isSubmitting || isSaving) && (
+              {(isSubmitting || isLoading) && (
                 <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               )}
               {profileId ? 'Save Changes' : 'Create Profile'}

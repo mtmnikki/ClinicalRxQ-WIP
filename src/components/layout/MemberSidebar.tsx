@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAuthStore } from '../../stores/authStore';
-import { useProfilesStore } from '../../stores/profilesStore';
+import { useProfile } from '../../contexts/ProfileContext';
 import LogoImage from '../../assets/images/logoimage.svg';
 
 /**
@@ -60,10 +60,10 @@ export default function MemberSidebar() {
   const location = useLocation();
   const { member } = useAuth();
   const { logout } = useAuthStore();
-  const { profiles, currentProfileId } = useProfilesStore();
+  const { activeProfile } = useProfile();
 
-  // Get the current active profile
-  const currentProfile = profiles.find(p => p.id === currentProfileId);
+  // Use the active profile from context
+  const currentProfile = activeProfile;
 
   // Collapsible groups default to collapsed
   const [openPrograms, setOpenPrograms] = useState(false);

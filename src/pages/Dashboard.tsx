@@ -7,7 +7,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import AppShell from '../components/layout/AppShell';
 import { useAuth } from '../contexts/AuthContext';
-import { useProfilesStore } from '../stores/profilesStore';
+import { useProfile } from '../contexts/ProfileContext';
 import { programsService, dashboardService } from '../lib/supabaseClient';
 import {
   Announcement,
@@ -119,12 +119,12 @@ const QuickCard: React.FC<{ item: QuickAccessItem }> = ({ item }) => {
  * Dashboard component (compact)
  */
 export default function Dashboard() {
-  const { member } = useAuth();
-  const { profiles, currentProfileId } = useProfilesStore();
+  const { user, account } = useAuth();
+  const { activeProfile } = useProfile();
   const [programs, setPrograms] = useState<ClinicalProgram[]>([]);
 
-  // Get the current active profile
-  const currentProfile = profiles.find(p => p.id === currentProfileId);
+  // Use activeProfile from context
+  const currentProfile = activeProfile;
   const [quick, setQuick] = useState<QuickAccessItem[]>([]);
   const [bookmarks, setBookmarks] = useState<ResourceItem[]>([]);
   const [activity, setActivity] = useState<RecentActivity[]>([]);
@@ -174,7 +174,7 @@ export default function Dashboard() {
       header={
         <div className="mx-auto flex max-w-[1440px] items-center justify-between px-3 py-3 text-[13px]">
           <div>
-            <div className="text-lg font-semibold">Welcome back, {currentProfile?.firstName ?? member?.pharmacyName ?? 'Member'}</div>
+            <div className="text-lg font-semibold">Welcome back, {currentProfile?.first_name ?? account?.pharmacy_name ?? 'Member'}</div>
             {/* Meta row: keep useful context chips */}
             <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-slate-600">
             </div>
