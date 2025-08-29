@@ -209,18 +209,30 @@ export type Database = {
           id: string
           profile_id: string | null
           resource_id: string
+<<<<<<< Updated upstream
+=======
+          resource_type: Database["public"]["Enums"]["specific_resource_type"]
+>>>>>>> Stashed changes
         }
         Insert: {
           created_at?: string | null
           id?: string
           profile_id?: string | null
           resource_id: string
+<<<<<<< Updated upstream
+=======
+          resource_type: Database["public"]["Enums"]["specific_resource_type"]
+>>>>>>> Stashed changes
         }
         Update: {
           created_at?: string | null
           id?: string
           profile_id?: string | null
           resource_id?: string
+<<<<<<< Updated upstream
+=======
+          resource_type?: Database["public"]["Enums"]["specific_resource_type"]
+>>>>>>> Stashed changes
         }
         Relationships: [
           {
@@ -584,7 +596,11 @@ export type Database = {
           nabp_eprofile_id: string | null
           phone_number: string | null
           profile_email: string | null
+<<<<<<< Updated upstream
           profile_role: Database["public"]["Enums"]["profile_role"] | null
+=======
+          role: Database["public"]["Enums"]["profile_role"] | null
+>>>>>>> Stashed changes
           updated_at: string | null
         }
         Insert: {
@@ -597,7 +613,11 @@ export type Database = {
           nabp_eprofile_id?: string | null
           phone_number?: string | null
           profile_email?: string | null
+<<<<<<< Updated upstream
           profile_role?: Database["public"]["Enums"]["profile_role"] | null
+=======
+          role?: Database["public"]["Enums"]["profile_role"] | null
+>>>>>>> Stashed changes
           updated_at?: string | null
         }
         Update: {
@@ -610,12 +630,20 @@ export type Database = {
           nabp_eprofile_id?: string | null
           phone_number?: string | null
           profile_email?: string | null
+<<<<<<< Updated upstream
           profile_role?: Database["public"]["Enums"]["profile_role"] | null
+=======
+          role?: Database["public"]["Enums"]["profile_role"] | null
+>>>>>>> Stashed changes
           updated_at?: string | null
         }
         Relationships: [
           {
+<<<<<<< Updated upstream
             foreignKeyName: "member_profiles_member_account_id_fkey"
+=======
+            foreignKeyName: "member_profiles_member_account_id_fkey1"
+>>>>>>> Stashed changes
             columns: ["member_account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
@@ -1764,6 +1792,85 @@ export type Database = {
           },
         ]
       }
+<<<<<<< Updated upstream
+=======
+      member_training_status: {
+        Row: {
+          attempts: number | null
+          completed_at: string | null
+          completion_percentage: number | null
+          first_name: string | null
+          id: string | null
+          is_completed: boolean | null
+          last_name: string | null
+          member_profile_id: string | null
+          module_length: string | null
+          module_name: string | null
+          program_name: string | null
+          score: number | null
+          started_at: string | null
+          training_module_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_training_progress_profile_id_fkey"
+            columns: ["member_profile_id"]
+            isOneToOne: false
+            referencedRelation: "member_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_training_progress_training_module_id_fkey"
+            columns: ["training_module_id"]
+            isOneToOne: false
+            referencedRelation: "hba1c_training"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_training_progress_training_module_id_fkey"
+            columns: ["training_module_id"]
+            isOneToOne: false
+            referencedRelation: "mtmthefuturetoday_training"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_training_progress_training_module_id_fkey"
+            columns: ["training_module_id"]
+            isOneToOne: false
+            referencedRelation: "oralcontraceptives_training"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_training_progress_training_module_id_fkey"
+            columns: ["training_module_id"]
+            isOneToOne: false
+            referencedRelation: "testandtreat_training"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_training_progress_training_module_id_fkey"
+            columns: ["training_module_id"]
+            isOneToOne: false
+            referencedRelation: "timemymeds_training"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_training_progress_training_module_id_fkey"
+            columns: ["training_module_id"]
+            isOneToOne: false
+            referencedRelation: "training_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_training_progress_training_module_id_fkey"
+            columns: ["training_module_id"]
+            isOneToOne: false
+            referencedRelation: "training_resources_view"
+            referencedColumns: ["training_module_id"]
+          },
+        ]
+      }
+>>>>>>> Stashed changes
       mtm_the_future_today_by_use_case: {
         Row: {
           content_class: string | null
@@ -3405,6 +3512,21 @@ export type Database = {
         Args: { data: string }
         Returns: string
       }
+<<<<<<< Updated upstream
+=======
+      categorize_file: {
+        Args: { file_path: string }
+        Returns: {
+          category: string
+          program_name: string
+          subcategory: string
+        }[]
+      }
+      create_program_use_case_views: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+>>>>>>> Stashed changes
       get_file_statistics: {
         Args: { p_days_back?: number; p_file_id: string }
         Returns: {
@@ -3416,6 +3538,21 @@ export type Database = {
           unique_viewers: number
         }[]
       }
+<<<<<<< Updated upstream
+=======
+      get_related_files: {
+        Args: { file_id: string; limit_count?: number }
+        Returns: {
+          content_class: string
+          file_name: string
+          file_path: string
+          file_url: string
+          id: string
+          program_name: string
+          relation_type: string
+        }[]
+      }
+>>>>>>> Stashed changes
       http: {
         Args: { request: Database["public"]["CompositeTypes"]["http_request"] }
         Returns: Database["public"]["CompositeTypes"]["http_response"]
@@ -3480,6 +3617,13 @@ export type Database = {
           path: string
         }[]
       }
+<<<<<<< Updated upstream
+=======
+      parse_file_path_to_columns: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+>>>>>>> Stashed changes
       populate_storage_files_catalog: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -3522,6 +3666,20 @@ export type Database = {
           subcategory: string
         }[]
       }
+<<<<<<< Updated upstream
+=======
+      split_filename: {
+        Args: { full_filename: string }
+        Returns: {
+          base_name: string
+          file_type: string
+        }[]
+      }
+      strip_file_extension: {
+        Args: { filename: string }
+        Returns: string
+      }
+>>>>>>> Stashed changes
       text_to_bytea: {
         Args: { data: string }
         Returns: string
@@ -3530,10 +3688,36 @@ export type Database = {
         Args: { p_file_id: string; p_profile_id: string }
         Returns: undefined
       }
+<<<<<<< Updated upstream
+=======
+      update_category_from_path_parts: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      update_form_category_from_use_case: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      update_form_subcategory: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      update_medical_conditions_from_subcategory: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+>>>>>>> Stashed changes
       update_resource_file_reference: {
         Args: { file_id: string; res_id: string; table_name: string }
         Returns: boolean
       }
+<<<<<<< Updated upstream
+=======
+      update_subcategory_from_path_parts: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+>>>>>>> Stashed changes
       urlencode: {
         Args: { data: Json } | { string: string } | { string: string }
         Returns: string
@@ -3542,10 +3726,17 @@ export type Database = {
     Enums: {
       medical_conditions:
         | "Beers List"
+<<<<<<< Updated upstream
         | "Hypertension"
         | "Cholesterol"
         | "Diabetes"
         | "Heart Failure"
+=======
+        | "Cardiovascular"
+        | "Chronic Pain"
+        | "Endocrine"
+        | "ENT"
+>>>>>>> Stashed changes
         | "Gastrointestinal"
         | "Genitourinary"
         | "Hematological"
@@ -3555,7 +3746,10 @@ export type Database = {
         | "Psychiatric"
         | "Reproductive"
         | "Respiratory"
+<<<<<<< Updated upstream
         | "Pain"
+=======
+>>>>>>> Stashed changes
         | "Other"
       profile_role:
         | "Pharmacist"
@@ -3728,10 +3922,17 @@ export const Constants = {
     Enums: {
       medical_conditions: [
         "Beers List",
+<<<<<<< Updated upstream
         "Hypertension",
         "Cholesterol",
         "Diabetes",
         "Heart Failure",
+=======
+        "Cardiovascular",
+        "Chronic Pain",
+        "Endocrine",
+        "ENT",
+>>>>>>> Stashed changes
         "Gastrointestinal",
         "Genitourinary",
         "Hematological",
@@ -3741,7 +3942,10 @@ export const Constants = {
         "Psychiatric",
         "Reproductive",
         "Respiratory",
+<<<<<<< Updated upstream
         "Pain",
+=======
+>>>>>>> Stashed changes
         "Other",
       ],
       profile_role: [
