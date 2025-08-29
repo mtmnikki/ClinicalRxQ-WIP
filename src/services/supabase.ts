@@ -100,7 +100,6 @@ export interface Profile {
   first_name?: string;
   last_name?: string;
   pharmacy_name?: string;
-  subscription_status?: string;
   created_at: string;
   updated_at: string;
 }
@@ -222,28 +221,6 @@ export const resourceLibraryService = {
     return sbFetch<MedicalBillingResource[]>('/medical_billing_resources?select=*&order=name.asc');
   },
 
-  /** Merge all resources with category label (optional filter) */
-  async getAllResources(category?: string): Promise<
-    Array<{
-      id: string;
-      name: string;
-      file_path?: string;
-      category: 'handouts' | 'clinical' | 'billing';
-    }>
-  > {
-    const [handouts, guidelines, billing] = await Promise.all([
-      !category || category === 'handouts' ? this.getPatientHandouts() : [],
-      !category || category === 'clinical' ? this.getClinicalGuidelines() : [],
-      !category || category === 'billing' ? this.getMedicalBillingResources() : [],
-    ]);
-
-    return [
-      ...handouts.map((h) => ({ ...h, category: 'handouts' as const })),
-      ...guidelines.map((g) => ({ ...g, category: 'clinical' as const })),
-      ...billing.map((b) => ({ ...b, category: 'billing' as const })),
-    ];
-  },
-};
 
 /**
  * Real Supabase authentication service using GoTrue
@@ -275,7 +252,6 @@ export const authService = {
         first_name: user.user_metadata?.first_name || '',
         last_name: user.user_metadata?.last_name || '',
         pharmacy_name: user.user_metadata?.pharmacy_name || '',
-        subscription_status: user.user_metadata?.subscription_status || 'Active',
         created_at: user.created_at || new Date().toISOString(),
         updated_at: user.updated_at || new Date().toISOString(),
       };
@@ -284,36 +260,6 @@ export const authService = {
       return null;
     }
   },
-
-  /** Update user profile */
-  async updateProfile(updates: Partial<Profile>): Promise<Profile> {
-    const user = await supabaseAuth.getUser();
-    if (!user) {
-      throw new Error('No authenticated user');
-    }
-
-    // Update user metadata in auth
-    const { first_name, last_name, pharmacy_name, ...profileUpdates } = updates;
-    const metadata: Record<string, unknown> = {};
-    if (first_name !== undefined) metadata.first_name = first_name;
-    if (last_name !== undefined) metadata.last_name = last_name;
-    if (pharmacy_name !== undefined) metadata.pharmacy_name = pharmacy_name;
-
-    if (Object.keys(metadata).length > 0) {
-      await supabaseAuth.updateUser({ data: metadata });
-    }
-
-    // Try to update profiles table if it exists
-    if (Object.keys(profileUpdates).length > 0) {
-      try {
-        await sbFetch(`/profiles?id=eq.${user.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify(profileUpdates),
-        });
-      } catch (error) {
-        console.warn('Could not update profiles table:', error);
-      }
-    }
 
     // Return updated profile
     const current = await this.getCurrentProfile();
