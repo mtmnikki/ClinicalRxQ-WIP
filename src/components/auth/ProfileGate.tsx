@@ -1,181 +1,105 @@
 /**
- * ProfileGate
- * - Purpose: After authentication, ensure a profile is selected.
- * - Behavior:
- *   - Loads profiles for the current user (localStorage-backed).
- *   - If no currentProfile is set:
- *     - If profiles exist: open a modal to choose one.
- *     - If none exist: prompt to create a new profile (opens Add Profile modal).
- * - Note: This gate does not change routes; it overlays as a modal and blocks interaction until set.
+ * ProfileGate - Enforces profile selection after authentication.
+ *
+ * This component is the user-facing part of the "Account vs. Profile" architecture.
+ * It consumes both AuthContext and ProfileContext to decide what to render:
+ * 1. A loading state while profiles are being fetched.
+ * 2. A "Create Profile" screen if the account has no profiles.
+ * 3. A "Select Profile" screen if profiles exist but none is active.
+ * 4. The actual protected content (`children`) if an active profile is set.
  */
-
-import React, { useEffect, useMemo, useState } from 'react';
-import { useAuthStore } from '../../stores/authStore';
-import { useProfilesStore } from '../../stores/profilesStore';
-import type { PharmacyProfile } from '../../types';
+import React, { useState } from 'react';
+import { useProfile } from '../../contexts/ProfileContext';
 import { Button } from '../ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '../ui/dialog';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import AddProfileModal from '../profiles/AddProfileModal';
 
-/**
- * Render a compact profile selection list.
- */
-function ProfileList({
-  profiles,
-  selectedId,
-  onSelect,
-}: {
-  profiles: PharmacyProfile[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <div className="mt-3 divide-y rounded-md border bg-white">
-      {profiles.map((p) => {
-        const active = selectedId === p.id;
-        return (
-          <button
-            key={p.id}
-            type="button"
-            className={[
-              'flex w-full items-center justify-between px-3 py-2 text-left',
-              active ? 'bg-blue-50' : 'hover:bg-slate-50',
-            ].join(' ')}
-            onClick={() => onSelect(p.id)}
-          >
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium text-slate-900">
-                {p.firstName} {p.lastName}
-              </div>
-              <div className="text-xs text-slate-500">{p.role}</div>
-            </div>
-            <div
-              className={[
-                'h-2.5 w-2.5 rounded-full',
-                active ? 'bg-blue-600' : 'bg-slate-300',
-              ].join(' ')}
-              aria-hidden
-            />
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+export default function ProfileGate({ children }: { children: React.ReactNode }) {
+  const { activeProfile, profiles, isLoading, error, selectProfile } = useProfile();
+  const [showAddModal, setShowAddModal] = useState(false);
 
-/**
- * ProfileGate component
- */
-export default function ProfileGate() {
-  const { user, isAuthenticated } = useAuthStore();
-  const {
-    ensureLoaded,
-    profiles,
-    currentProfileId,
-    setCurrentProfile,
-    reset,
-  } = useProfilesStore();
-
-  const [selectOpen, setSelectOpen] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
-  const [pickedId, setPickedId] = useState<string | null>(null);
-
-  // Sync load/reset with auth state
-  useEffect(() => {
-    if (isAuthenticated && user?.id) {
-      ensureLoaded(user.id);
-    } else {
-      // reset profiles when not authenticated
-      reset();
-    }
-  }, [isAuthenticated, user?.id, ensureLoaded, reset]);
-
-  // Decide when to show the selection overlay
-  useEffect(() => {
-    if (!isAuthenticated || !user?.id) {
-      setSelectOpen(false);
-      setAddOpen(false);
-      return;
-    }
-
-    // Already selected => nothing to prompt
-    if (currentProfileId) {
-      setSelectOpen(false);
-      setAddOpen(false);
-      return;
-    }
-
-    // No selection yet
-    if (profiles.length === 0) {
-      // No profiles → ask to create
-      setAddOpen(true);
-      setSelectOpen(false);
-    } else {
-      // Profiles exist → ask to choose
-      setPickedId(profiles[0].id);
-      setSelectOpen(true);
-      setAddOpen(false);
-    }
-  }, [isAuthenticated, user?.id, currentProfileId, profiles]);
-
-  const selectedProfile = useMemo(
-    () => profiles.find((p) => p.id === pickedId) || null,
-    [profiles, pickedId]
-  );
-
-  // Confirm selection
-  function handleConfirm() {
-    if (pickedId) setCurrentProfile(pickedId);
-    setSelectOpen(false);
+  // 1. Loading State
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+          <p className="mt-4 text-slate-600">Loading your profiles...</p>
+        </div>
+      </div>
+    );
   }
 
-  return (
-    <>
-      {/* Selection dialog (blocking) */}
-      <Dialog open={selectOpen} onOpenChange={(open) => setSelectOpen(open)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Select a profile</DialogTitle>
-            <DialogDescription>
-              Choose who is currently using the account. You can switch profiles later in Account Settings.
-            </DialogDescription>
-          </DialogHeader>
+  // Error State
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader><CardTitle className="text-red-600">Error Loading Profiles</CardTitle></CardHeader>
+          <CardContent><p>{error}</p></CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-          <ProfileList
-            profiles={profiles}
-            selectedId={pickedId}
-            onSelect={setPickedId}
-          />
-
-          <div className="mt-4 flex items-center justify-between gap-2">
-            <Button variant="outline" onClick={() => setAddOpen(true)}>
-              Add Profile
+  // 2. No Profiles Exist: Force user to create their first one.
+  if (profiles.length === 0) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle>Create Your First Profile</CardTitle>
+            <CardDescription>
+              To get started, please create a user profile for your account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => setShowAddModal(true)} className="w-full" size="lg">
+              Create Profile
             </Button>
-            <Button onClick={handleConfirm} disabled={!pickedId}>
-              Continue
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+        <AddProfileModal open={showAddModal} onOpenChange={setShowAddModal} />
+      </div>
+    );
+  }
 
-      {/* Add Profile modal (also used when there are no profiles yet) */}
-      <AddProfileModal
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        onCreated={(createdId) => {
-          // If we just created the first profile, close add and (auto)select
-          if (!currentProfileId) {
-            setPickedId(createdId);
-            setSelectOpen(true);
-          }
-        }}
-      />
-    </>
-  );
+  // 3. Profiles Exist, but None is Active: Force user to select one.
+  if (!activeProfile) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+        <Card className="w-full max-w-lg">
+          <CardHeader className="text-center">
+            <CardTitle>Select Your Profile</CardTitle>
+            <CardDescription>Who is using ClinicalRxQ right now?</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {profiles.map((profile) => (
+              <button
+                key={profile.profile_id}
+                onClick={() => selectProfile(profile.profile_id)}
+                className="flex w-full items-center justify-between rounded-lg border p-4 text-left transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <div>
+                  <h4 className="font-medium">{profile.first_name} {profile.last_name}</h4>
+                  <p className="text-sm text-slate-600">{profile.profile_role}</p>
+                </div>
+                <div className="text-sm font-semibold text-blue-600">Select →</div>
+              </button>
+            ))}
+             <div className="border-t pt-4 mt-2">
+              <Button variant="outline" onClick={() => setShowAddModal(true)} className="w-full">
+                Add Another Profile
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        <AddProfileModal open={showAddModal} onOpenChange={setShowAddModal} />
+      </div>
+    );
+  }
+
+  // 4. Success: An active profile is set, so render the protected content.
+  return <>{children}</>;
 }
+

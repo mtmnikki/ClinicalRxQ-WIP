@@ -1,35 +1,34 @@
-/** 
- * ProgramDetail page (Supabase-only, storage_files_catalog backed)
+/** * ProgramDetail page (Supabase-only, storage_files_catalog backed)
  * - Purpose: Display a single clinical program by slug with grouped resources:
- *   Overview, Training Modules, Protocol Manuals, Documentation Forms, Additional Resources.
+ * Overview, Training Modules, Protocol Manuals, Documentation Forms, Additional Resources.
  * - Data: Supabase Storage via storageCatalog.getProgramResourcesGrouped (no Airtable).
  * - Layout: Blue→cyan gradient hero with glassmorphism container, then a horizontal Tabs nav.
  * - UX: Dense, full-width rows using ProgramResourceRow inside each tab; URL sync via ?tab=.
  * - Update: MTM forms (Forms tab) are sectioned and now collapsible (collapsed by default) with smooth transitions.
  * - New: Prescriber Communication Forms are further split into collapsible subsections (collapsed by default):
- *   General, Drug Interactions, Needs Drug Therapy, Optimize Medication Therapy, Suboptimal Drug Selection/High Risk Medication.
+ * General, Drug Interactions, Needs Drug Therapy, Optimize Medication Therapy, Suboptimal Drug Selection/High Risk Medication.
  * - New (this update): Test & Treat forms are separated into collapsible sections: COVID, Flu, Strep.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useLocation, useNavigate, Link } from 'react-router';
-import { Card, CardContent } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { Button } from '../components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
+import { useParams, useLocation, useNavigate, Link } from 'react-router-dom'; // Use react-router-dom for web
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ChevronDown, ChevronRight, LibraryBig } from 'lucide-react';
-import Breadcrumbs from '../components/common/Breadcrumbs';
-import SafeText from '../components/common/SafeText';
-import AppShell from '../components/layout/AppShell';
-import MemberSidebar from '../components/layout/MemberSidebar';
-import ProgramResourceRow from '../components/resources/ProgramResourceRow';
+import Breadcrumbs from '@/components/common/Breadcrumbs';
+import SafeText from '@/components/common/SafeText';
+import AppShell from '@/components/layout/AppShell';
+import MemberSidebar from '@/components/layout/MemberSidebar';
+import ProgramResourceRow from '@/components/resources/ProgramResourceRow';
 import {
   getProgramResourcesGrouped,
   ProgramSlugs,
   listProgramsFromStorage,
   type ProgramSlug,
-} from '../services/storageCatalog';
-import type { StorageFileItem } from '../services/supabaseStorage';
+} from '@/services/storageCatalog';
+import type { StorageFileItem } from '@/services/supabaseStorage';
 
 /**
  * Tab identifiers for the ProgramDetail page
@@ -149,7 +148,7 @@ function buildMtmFormSections(
 /**
  * Build Prescriber Communication subsections:
  * - Splits the given prescriber items into 5 groups:
- *   Drug Interactions, Needs Drug Therapy, Optimize Medication Therapy, Suboptimal/HRM, and General (remaining).
+ * Drug Interactions, Needs Drug Therapy, Optimize Medication Therapy, Suboptimal/HRM, and General (remaining).
  * - Only returns non-empty groups.
  */
 function buildPrescriberSubsections(
