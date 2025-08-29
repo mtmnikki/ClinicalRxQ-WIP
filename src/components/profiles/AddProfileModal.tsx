@@ -112,7 +112,6 @@ export default function AddProfileModal({
   useEffect(() => {
     // When switching open/edit target, refresh the form defaults
     if (open) {
-      clearError(); // Clear any previous errors
       reset({
         role: (defaultValues?.role as ProfileRole) || undefined,
         firstName: defaultValues?.firstName || '',
@@ -123,7 +122,7 @@ export default function AddProfileModal({
         nabpEProfileId: defaultValues?.nabpEProfileId || '',
       });
     }
-  }, [open, defaultValues, reset, clearError]);
+  }, [open, defaultValues, reset]);
 
   async function onSubmit(values: FormValues) {
     if (!user?.id) return;
