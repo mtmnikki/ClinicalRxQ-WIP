@@ -44,11 +44,12 @@ export const useAuthStore = create<AuthState>()(
             const account = await authService.getCurrentAccount();
             
             if (account) {
-              const account: User = {
+              const user: User = {
                 id: account.id,
-                email: pharmacy.email,
+                email: account.email,
                 role: 'authenticated',
-                subscription: { 'Active' ? 'active' : 'inactive',
+                subscription: {
+                  status: 'active',
                   startDate: new Date(account.created_at),
                   endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
                   programs: ['mtm-future-today', 'timemymeds', 'test-treat'],

@@ -1,127 +1,103 @@
 /**
- * ProgramResourceRow
- * - Purpose: Single-column, dense row card for Program Detail sections.
- * - Contents: brand-colored file icon (left), file name (title), optional duration (videos), and one action button.
- *   - Video: "Play" only (no download).
- *   - Non-video: "Download" only.
- * - Change: Avoid duplicate subtitle line when filename equals the title (normalized).
+ * ProgramResourceRow - Dense, clean resource display
+ * - Desktop-optimized: Tight spacing for maximum content visibility
+ * - Minimal: Icon + filename (+ duration for videos) + action button only
+ * - Videos show in modal, documents download
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '../ui/button';
-import {
-  Download,
-  File,
-  FileSpreadsheet,
-  FileText,
-  Play,
-} from 'lucide-react';
-import type { StorageFileItem } from '../../services/supabaseStorage';
-import {
-  isDoc,
-  isPdf,
-  isSpreadsheet,
-  isVideo,
-} from '../../services/supabaseStorage';
+import { Download, Play, FileText, Clock } from 'lucide-react';
+import SafeText from '../common/SafeText';
+import VideoModal from '../ui/video-modal';
 
-/**
- * Infer a duration label from the filename or title, if present.
- * Looks for patterns like [mm:ss] or (mm:ss); otherwise returns undefined.
- */
-function inferDurationLabel(name: string): string | undefined {
-  const m = name.match(/[\[\(]([0-5]?\d:[0-5]\d)[\]\)]/);
-  return m?.[1];
+// Interface for resource items
+interface StorageFileItem {
+  file_name: string;
+  file_url: string;
+  resource_type: string;
+  length?: string; // Duration for training modules
 }
 
 /**
- * Choose a brand-colored icon for a given file type
- */
-function BrandFileIcon({ item }: { item: StorageFileItem }) {
-  const cls = 'h-5 w-5 text-blue-600'; // Brand color
-  if (isVideo(item)) return <Play className={cls} />;
-  if (isSpreadsheet(item)) return <FileSpreadsheet className={cls} />;
-  if (isPdf(item) || isDoc(item)) return <FileText className={cls} />;
-  return <File className={cls} />;
-}
-
-/**
- * Return the base name of a filename by stripping the last extension.
- * Example: "Doc.Name.pdf" -> "Doc.Name"
- */
-function stripOneExtension(filename: string): string {
-  return filename.replace(/\.[^./\s]+$/i, '');
-}
-
-/**
- * Normalize text for comparison:
- * - Lowercase
- * - Replace non-alphanumeric with single spaces
- * - Collapse multiple spaces and trim
- */
-function normalizeForCompare(s: string): string {
-  return (s || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/**
- * ProgramResourceRow component
+ * ProgramResourceRow component - Dense desktop layout
  */
 export default function ProgramResourceRow({ item }: { item: StorageFileItem }) {
-  const video = isVideo(item);
-  const title = item.title || item.filename || '';
-  const filename = item.filename || '';
-  const duration = video ? inferDurationLabel(title) : undefined;
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const isVideo = item.resource_type === 'training_module';
+  
+  // Remove file extension for cleaner display
+  const displayName = item.file_name.replace(/\.[^/.]+$/, '');
 
-  // Determine whether to show the subtitle (filename).
-  // Hide if normalized(title) equals normalized(filename without extension).
-  const isDuplicateSubtitle =
-    !filename ||
-    normalizeForCompare(title) === normalizeForCompare(stripOneExtension(filename));
+  const handleAction = () => {
+    if (isVideo) {
+      setIsVideoModalOpen(true);
+    } else {
+      // Download document
+      const link = document.createElement('a');
+      link.href = item.file_url;
+      link.download = item.file_name;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
 
   return (
-    <div className="rounded-md border bg-white px-4 py-3 shadow-sm hover:shadow transition-shadow">
-      <div className="flex items-center justify-between gap-3">
-        {/* Left: icon + filename */}
-        <div className="flex min-w-0 items-center gap-3">
-          <BrandFileIcon item={item} />
-          <div className="min-w-0">
-            <div className="truncate text-sm font-medium text-slate-900">
-              {title}
-            </div>
-            {!isDuplicateSubtitle ? (
-              <div className="text-[11px] text-slate-500">{filename}</div>
-            ) : null}
+    <>
+      <div className="flex items-center justify-between gap-3 rounded border bg-white px-3 py-2 hover:shadow-sm transition-shadow">
+        {/* Left: Icon + Name (+ Duration for videos) */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-blue-600 via-cyan-500 to-teal-300 flex-shrink-0">
+            {isVideo ? (
+              <Play className="h-4 w-4 text-white" />
+            ) : (
+              <FileText className="h-4 w-4 text-white" />
+            )}
+          </div>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm text-slate-900 truncate">
+              <SafeText text={displayName} />
+            </span>
+            {isVideo && item.length && (
+              <span className="text-xs text-slate-500 flex items-center gap-1 flex-shrink-0">
+                <Clock className="h-3 w-3" />
+                {item.length}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Right: optional duration + action */}
-        <div className="flex shrink-0 items-center gap-3">
-          {video && duration ? (
-            <span className="text-xs text-slate-600" aria-label="Video duration">
-              {duration}
-            </span>
-          ) : null}
-
-          {video ? (
-            <a href={item.url} target="_blank" rel="noreferrer">
-              <Button className="h-8 px-3">
-                <Play className="mr-2 h-4 w-4" />
-                Play
-              </Button>
-            </a>
+        {/* Right: Action button */}
+        <Button 
+          size="sm" 
+          onClick={handleAction}
+          className="h-7 px-2 text-xs flex-shrink-0"
+        >
+          {isVideo ? (
+            <>
+              <Play className="mr-1 h-3 w-3" />
+              Play
+            </>
           ) : (
-            <a href={item.url} target="_blank" rel="noreferrer">
-              <Button className="h-8 px-3">
-                <Download className="mr-2 h-4 w-4" />
-                Download
-              </Button>
-            </a>
+            <>
+              <Download className="mr-1 h-3 w-3" />
+              Download
+            </>
           )}
-        </div>
+        </Button>
       </div>
-    </div>
+
+      {/* Video Modal */}
+      {isVideo && (
+        <VideoModal
+          isOpen={isVideoModalOpen}
+          onClose={() => setIsVideoModalOpen(false)}
+          videoUrl={item.file_url}
+          title={displayName}
+        />
+      )}
+    </>
   );
 }

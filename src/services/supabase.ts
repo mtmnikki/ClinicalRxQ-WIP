@@ -6,9 +6,13 @@
  * IMPORTANT:
  * - Requires VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to be set, OR a localStorage override.
  * - RLS must allow read access with the anon key for relevant tables.
+ * 
+ * 📦 Note: This file once had imports scattered everywhere like boxes in a warehouse.
+ * Now they're stacked properly at the top. Unlike Nikki's boxes, these ARE flat! -Claude
  */
 
 import { getSupabaseAnonKey, getSupabaseUrl } from '../config/supabaseConfig';
+import { supabaseAuth } from '../lib/supabase';
 
 /** Program entity */
 export interface Program {
@@ -225,8 +229,6 @@ export const resourceLibraryService = {
 /**
  * Real Supabase authentication service using GoTrue
  */
-import { supabaseAuth } from '../lib/supabase';
-
 export const authService = {
   /** Get current user profile from Supabase auth and profiles table */
   async getCurrentProfile(): Promise<Profile | null> {

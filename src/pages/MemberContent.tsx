@@ -1,11 +1,9 @@
 /**
- * Member Content page (Programs listing, Supabase-only)
- * - Purpose: Show available programs discovered from Supabase-aware catalog (no Airtable).
- * - Layout: AppShell with MemberSidebar (consistent member frame).
- * - Data: listProgramsFromStorage() from storageCatalog (ProgramSlugs + curated metadata).
+ * Member Content page - Programs listing from database
+ * Uses the programs table as specified in CLAUDE.md
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { Button } from '../components/ui/button';
 import {
@@ -20,22 +18,21 @@ import Breadcrumbs from '../components/common/Breadcrumbs';
 import SafeText from '../components/common/SafeText';
 import AppShell from '../components/layout/AppShell';
 import MemberSidebar from '../components/layout/MemberSidebar';
-import {
-  listProgramsFromStorage,
-  type ProgramListItem,
-} from '../services/storageCatalog';
+import { programsService, type Program } from '../services/supabaseClient';
 
-/** UI type for program card */
-interface ProgramUIItem {
-  slug: string;
-  title: string;
-  description: string | null | undefined;
-  level?: string;
-  color: string;
-  icon: React.ComponentType<{ className?: string }>;
+/**
+ * Convert program name to URL slug
+ */
+function generateSlug(programName: string): string {
+  return programName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
-/** Visual mapping helper (placeholder: all brand gradient) */
+/**
+ * Get visual styling based on experience level
+ */
 function getProgramVisuals(level?: string) {
   const lower = (level || '').toLowerCase();
   if (lower.includes('advanced') || lower.includes('expert')) {
@@ -47,160 +44,120 @@ function getProgramVisuals(level?: string) {
   return { color: 'from-blue-600 via-cyan-500 to-teal-300', icon: FileText };
 }
 
-/**
- * MemberContent component (Supabase-backed)
- */
 export default function MemberContent() {
-  const [programs, setPrograms] = useState<ProgramListItem[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /** Load program list (Supabase catalog, no API routes) */
   useEffect(() => {
-    async function load() {
+    async function loadPrograms() {
       try {
         setLoading(true);
         setError(null);
-        const items = await listProgramsFromStorage();
-        setPrograms(items || []);
+        const data = await programsService.getAllPrograms();
+        setPrograms(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load programs');
-        // eslint-disable-next-line no-console
-        console.error('Error loading programs (Supabase):', err);
+        console.error('Error loading programs:', err);
       } finally {
         setLoading(false);
       }
     }
-    load();
+    loadPrograms();
   }, []);
-
-  /** Map DTO → UI model */
-  const programUIItems: ProgramUIItem[] = useMemo(
-    () =>
-      (programs || []).map((p) => {
-        const visuals = getProgramVisuals(undefined);
-        return {
-          slug: p.slug,
-          title: p.name,
-          description: p.description,
-          level: undefined,
-          color: visuals.color,
-          icon: visuals.icon,
-        };
-      }),
-    [programs]
-  );
 
   return (
     <AppShell sidebar={<MemberSidebar />}>
-      {/* Hero */}
+      {/* Hero Section */}
       <section className="relative -mx-3 bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-300 px-3 py-12 text-white">
         <div className="mx-auto max-w-[1440px]">
           <div className="max-w-4xl">
             <Breadcrumbs
-              variant="light"
               items={[
-                { label: 'Dashboard', to: '/dashboard' },
+                { label: 'Dashboard', href: '/dashboard' },
                 { label: 'Clinical Programs' },
               ]}
-              className="mb-4"
+              className="mb-4 text-white/80"
             />
-            <h1 className="text-3xl font-bold">Member Content</h1>
-            <p className="text-white/90">
-              Access your clinical training programs and resources
+            <h1 className="mb-4 text-4xl font-bold md:text-5xl">
+              Clinical Programs
+            </h1>
+            <p className="text-lg leading-relaxed text-white/90 md:text-xl">
+              Select a program below to access training modules, protocols, documentation forms, and additional resources.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Quick Resources */}
-      <section className="py-6">
-        <div className="max-w-4xl">
-          <Card className="border-cyan-400 bg-gradient-to-r from-blue-50 to-cyan-50">
-            <CardContent className="flex items-center justify-between p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-300">
-                  <BookOpen className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900">
-                    Resource Library
-                  </h3>
-                  <p className="text-gray-600">
-                    Access clinical tools, forms, and educational materials
-                  </p>
-                </div>
-              </div>
-              <Link to="/resources">
-                <Button className="bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-300 hover:opacity-90">
-                  <BookOpen className="mr-2 h-4 w-4" />
-                  View Resources
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Programs */}
-      <section className="py-6">
-        <div className="max-w-6xl">
-          {loading ? (
+      {/* Programs Grid */}
+      <section className="py-8">
+        <div className="mx-auto max-w-[1440px]">
+          {loading && (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-              <span className="ml-2 text-gray-600">Loading programs...</span>
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>
-          ) : error ? (
-            <div className="py-12 text-center">
-              <div className="mb-2 text-red-600">Error loading programs</div>
-              <div className="text-gray-600">{error}</div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {programUIItems.map((program) => {
-                const Icon = program.icon;
-                const to = `/program/${encodeURIComponent(program.slug)}`;
+          )}
+
+          {error && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="py-4">
+                <p className="text-sm text-red-600">{error}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {!loading && !error && programs.length === 0 && (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <BookOpen className="mx-auto mb-4 h-12 w-12 text-gray-400" />
+                <p className="text-gray-600">No programs available at this time.</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {!loading && !error && programs.length > 0 && (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {programs.map((program) => {
+                const visuals = getProgramVisuals(program.experience_level);
+                const Icon = visuals.icon;
+                const slug = generateSlug(program.name);
+
                 return (
-                  <Card
-                    key={program.slug}
-                    className="overflow-hidden transition-shadow hover:shadow-lg"
+                  <Card 
+                    key={program.name}
+                    className="group overflow-hidden transition-all hover:shadow-lg"
                   >
-                    <div className={`h-2 bg-gradient-to-r ${program.color}`} />
+                    <div className={`h-2 bg-gradient-to-r ${visuals.color}`} />
                     <CardHeader>
-                      <div className="mb-4 flex items-start justify-between">
-                        <div
-                          className={`flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-r ${program.color}`}
-                        >
+                      <div className="mb-2 flex items-start justify-between">
+                        <div className={`rounded-lg bg-gradient-to-br p-2 ${visuals.color}`}>
                           <Icon className="h-6 w-6 text-white" />
                         </div>
-                        {program.level ? (
-                          <div className="flex gap-2">
-                            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
-                              <SafeText value={program.level} />
-                            </span>
-                          </div>
-                        ) : null}
+                        {program.experience_level && (
+                          <span className="text-xs font-medium text-gray-500">
+                            {program.experience_level}
+                          </span>
+                        )}
                       </div>
-                      <CardTitle className="mb-2 text-xl">
-                        <SafeText value={program.title} />
+                      <CardTitle className="text-xl">
+                        <SafeText text={program.name} />
                       </CardTitle>
-                      {program.description ? (
-                        <CardDescription className="mb-4 text-gray-600">
-                          <SafeText value={program.description} />
-                        </CardDescription>
-                      ) : null}
+                      <CardDescription className="line-clamp-2">
+                        <SafeText text={program.description || 'Click to view training modules and resources'} />
+                      </CardDescription>
                     </CardHeader>
-
                     <CardContent>
-                      <div className="flex gap-3">
-                        <Link to={to} className="flex-1">
-                          <Button
-                            className={`w-full bg-gradient-to-r ${program.color} hover:opacity-90`}
-                          >
+                      <Link to={`/program/${slug}`}>
+                        <Button 
+                          className="w-full bg-gradient-to-r transition-all group-hover:shadow-md"
+                          variant="default"
+                        >
+                          <span className="flex items-center">
                             View Program
-                          </Button>
-                        </Link>
-                      </div>
+                            <BookOpen className="ml-2 h-4 w-4" />
+                          </span>
+                        </Button>
+                      </Link>
                     </CardContent>
                   </Card>
                 );
