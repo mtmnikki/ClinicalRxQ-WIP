@@ -111,25 +111,6 @@ function storeSession(session: Session | null) {
 }
 
 export const supabaseAuth = {
-  /**
-   * Sign up a new user
-   */
-  async signUp(email: string, password: string, metadata?: Record<string, unknown>) {
-    const response = await authFetch<{ user: User; session: Session | null }>('/signup', {
-      method: 'POST',
-      body: JSON.stringify({
-        email,
-        password,
-        data: metadata,
-      }),
-    });
-
-    if (response.data?.session) {
-      storeSession(response.data.session);
-    }
-
-    return response;
-  },
 
   /**
    * Sign in with email and password
