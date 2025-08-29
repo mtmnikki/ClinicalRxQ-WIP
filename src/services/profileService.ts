@@ -18,7 +18,6 @@ interface DatabaseProfile {
   user_email?: string;
   license_number?: string;
   nabp_eprofile_id?: string;
-  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -97,14 +96,13 @@ function mapFromDatabase(dbProfile: DatabaseProfile): PharmacyProfile {
   return {
     id: dbProfile.id,
     member_account_id: dbProfile.member_account_id,
-    role: dbProfile.role_type,
+    role: dbProfile.profile_role,
     firstName: dbProfile.first_name,
     lastName: dbProfile.last_name,
     phone: dbProfile.phone_number || undefined,
-    email: dbProfile.user_email || undefined,
+    email: dbProfile.profile_email || undefined,
     licenseNumber: dbProfile.license_number || undefined,
     nabpEProfileId: dbProfile.nabp_eprofile_id || undefined,
-    is_active: dbProfile.is_active,
     createdAt: dbProfile.created_at,
     updatedAt: dbProfile.updated_at,
   };
@@ -119,11 +117,11 @@ function mapToDatabase(
 ): Omit<DatabaseProfile, 'id' | 'created_at' | 'updated_at' | 'is_active'> {
   return {
     member_account_id: memberAccountId,
-    role_type: data.role,
+    profile_type: data.role,
     first_name: data.firstName,
     last_name: data.lastName,
     phone_number: data.phone || undefined,
-    user_email: data.email || undefined,
+    profile_email: data.email || undefined,
     license_number: data.licenseNumber || undefined,
     nabp_eprofile_id: data.nabpEProfileId || undefined,
   };
@@ -181,11 +179,11 @@ export const profileService = {
     // Convert updates to database format
     const dbUpdates: Record<string, any> = {};
     
-    if (updates.role !== undefined) dbUpdates.role = updates.role;
+    if (updates.profileRole !== undefined) dbUpdates.profile_role = updates.profileRole;
     if (updates.firstName !== undefined) dbUpdates.first_name = updates.firstName;
     if (updates.lastName !== undefined) dbUpdates.last_name = updates.lastName;
     if (updates.phone !== undefined) dbUpdates.phone_number = updates.phone || null;
-    if (updates.email !== undefined) dbUpdates.user_email = updates.email || null;
+    if (updates.email !== undefined) dbUpdates.profile_email = updates.email || null;
     if (updates.licenseNumber !== undefined) dbUpdates.license_number = updates.licenseNumber || null;
     if (updates.nabpEProfileId !== undefined) dbUpdates.nabp_eprofile_id = updates.nabpEProfileId || null;
 
