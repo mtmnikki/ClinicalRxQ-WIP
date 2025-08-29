@@ -209,21 +209,18 @@ export type Database = {
           id: string
           profile_id: string | null
           resource_id: string
-          resource_type: Database["public"]["Enums"]["specific_resource_type"]
         }
         Insert: {
           created_at?: string | null
           id?: string
           profile_id?: string | null
           resource_id: string
-          resource_type: Database["public"]["Enums"]["specific_resource_type"]
         }
         Update: {
           created_at?: string | null
           id?: string
           profile_id?: string | null
           resource_id?: string
-          resource_type?: Database["public"]["Enums"]["specific_resource_type"]
         }
         Relationships: [
           {
@@ -587,7 +584,7 @@ export type Database = {
           nabp_eprofile_id: string | null
           phone_number: string | null
           profile_email: string | null
-          role: Database["public"]["Enums"]["profile_role"] | null
+          profile_role: Database["public"]["Enums"]["profile_role"] | null
           updated_at: string | null
         }
         Insert: {
@@ -600,7 +597,7 @@ export type Database = {
           nabp_eprofile_id?: string | null
           phone_number?: string | null
           profile_email?: string | null
-          role?: Database["public"]["Enums"]["profile_role"] | null
+          profile_role?: Database["public"]["Enums"]["profile_role"] | null
           updated_at?: string | null
         }
         Update: {
@@ -613,12 +610,12 @@ export type Database = {
           nabp_eprofile_id?: string | null
           phone_number?: string | null
           profile_email?: string | null
-          role?: Database["public"]["Enums"]["profile_role"] | null
+          profile_role?: Database["public"]["Enums"]["profile_role"] | null
           updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "member_profiles_member_account_id_fkey1"
+            foreignKeyName: "member_profiles_member_account_id_fkey"
             columns: ["member_account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
@@ -1764,82 +1761,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "training_resources_view"
             referencedColumns: ["file_id"]
-          },
-        ]
-      }
-      member_training_status: {
-        Row: {
-          attempts: number | null
-          completed_at: string | null
-          completion_percentage: number | null
-          first_name: string | null
-          id: string | null
-          is_completed: boolean | null
-          last_name: string | null
-          member_profile_id: string | null
-          module_length: string | null
-          module_name: string | null
-          program_name: string | null
-          score: number | null
-          started_at: string | null
-          training_module_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "member_training_progress_profile_id_fkey"
-            columns: ["member_profile_id"]
-            isOneToOne: false
-            referencedRelation: "member_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "member_training_progress_training_module_id_fkey"
-            columns: ["training_module_id"]
-            isOneToOne: false
-            referencedRelation: "hba1c_training"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "member_training_progress_training_module_id_fkey"
-            columns: ["training_module_id"]
-            isOneToOne: false
-            referencedRelation: "mtmthefuturetoday_training"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "member_training_progress_training_module_id_fkey"
-            columns: ["training_module_id"]
-            isOneToOne: false
-            referencedRelation: "oralcontraceptives_training"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "member_training_progress_training_module_id_fkey"
-            columns: ["training_module_id"]
-            isOneToOne: false
-            referencedRelation: "testandtreat_training"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "member_training_progress_training_module_id_fkey"
-            columns: ["training_module_id"]
-            isOneToOne: false
-            referencedRelation: "timemymeds_training"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "member_training_progress_training_module_id_fkey"
-            columns: ["training_module_id"]
-            isOneToOne: false
-            referencedRelation: "training_modules"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "member_training_progress_training_module_id_fkey"
-            columns: ["training_module_id"]
-            isOneToOne: false
-            referencedRelation: "training_resources_view"
-            referencedColumns: ["training_module_id"]
           },
         ]
       }
@@ -3484,18 +3405,6 @@ export type Database = {
         Args: { data: string }
         Returns: string
       }
-      categorize_file: {
-        Args: { file_path: string }
-        Returns: {
-          category: string
-          program_name: string
-          subcategory: string
-        }[]
-      }
-      create_program_use_case_views: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       get_file_statistics: {
         Args: { p_days_back?: number; p_file_id: string }
         Returns: {
@@ -3505,18 +3414,6 @@ export type Database = {
           most_recent_access: string
           total_views: number
           unique_viewers: number
-        }[]
-      }
-      get_related_files: {
-        Args: { file_id: string; limit_count?: number }
-        Returns: {
-          content_class: string
-          file_name: string
-          file_path: string
-          file_url: string
-          id: string
-          program_name: string
-          relation_type: string
         }[]
       }
       http: {
@@ -3583,10 +3480,6 @@ export type Database = {
           path: string
         }[]
       }
-      parse_file_path_to_columns: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       populate_storage_files_catalog: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -3629,17 +3522,6 @@ export type Database = {
           subcategory: string
         }[]
       }
-      split_filename: {
-        Args: { full_filename: string }
-        Returns: {
-          base_name: string
-          file_type: string
-        }[]
-      }
-      strip_file_extension: {
-        Args: { filename: string }
-        Returns: string
-      }
       text_to_bytea: {
         Args: { data: string }
         Returns: string
@@ -3648,29 +3530,9 @@ export type Database = {
         Args: { p_file_id: string; p_profile_id: string }
         Returns: undefined
       }
-      update_category_from_path_parts: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      update_form_category_from_use_case: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      update_form_subcategory: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      update_medical_conditions_from_subcategory: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       update_resource_file_reference: {
         Args: { file_id: string; res_id: string; table_name: string }
         Returns: boolean
-      }
-      update_subcategory_from_path_parts: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
       }
       urlencode: {
         Args: { data: Json } | { string: string } | { string: string }
@@ -3680,10 +3542,10 @@ export type Database = {
     Enums: {
       medical_conditions:
         | "Beers List"
-        | "Cardiovascular"
-        | "Chronic Pain"
-        | "Endocrine"
-        | "ENT"
+        | "Hypertension"
+        | "Cholesterol"
+        | "Diabetes"
+        | "Heart Failure"
         | "Gastrointestinal"
         | "Genitourinary"
         | "Hematological"
@@ -3693,6 +3555,7 @@ export type Database = {
         | "Psychiatric"
         | "Reproductive"
         | "Respiratory"
+        | "Pain"
         | "Other"
       profile_role:
         | "Pharmacist"
@@ -3865,10 +3728,10 @@ export const Constants = {
     Enums: {
       medical_conditions: [
         "Beers List",
-        "Cardiovascular",
-        "Chronic Pain",
-        "Endocrine",
-        "ENT",
+        "Hypertension",
+        "Cholesterol",
+        "Diabetes",
+        "Heart Failure",
         "Gastrointestinal",
         "Genitourinary",
         "Hematological",
@@ -3878,6 +3741,7 @@ export const Constants = {
         "Psychiatric",
         "Reproductive",
         "Respiratory",
+        "Pain",
         "Other",
       ],
       profile_role: [

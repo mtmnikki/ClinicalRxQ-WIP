@@ -51,8 +51,8 @@ function getProgramVisuals(level?: string | null) {
  * MemberContent component (Supabase-backed)
  */
 export default function MemberContent() {
-  const [programs, setPrograms] = useState<Program[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function MemberContent() {
+  const [programs, setPrograms] = useState<ProgramListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   /** Load program list (Supabase tables via contentApi) */
