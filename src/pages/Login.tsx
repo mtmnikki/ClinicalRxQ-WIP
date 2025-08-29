@@ -36,7 +36,7 @@ type FormValues = z.infer<typeof schema>
  * Login Page Component with Header and secret alt+click bypass chips
  */
 const LoginPage: React.FC = () => {
-  const { login } = useAuthStore();
+  const { signIn } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation() as any;
   const [error, setError] = useState<string | null>(null);
@@ -84,13 +84,9 @@ const LoginPage: React.FC = () => {
   const onSubmit = async (data: FormValues) => {
     setError(null);
     try {
-      const success = await login(data.email, data.password);
-      if (success) {
-        const redirectTo = location.state?.from || '/dashboard';
-        navigate(redirectTo, { replace: true });
-      } else {
-        setError('Invalid email or password. Please check your credentials and try again.');
-      }
+      await signIn(data.email, data.password);
+      const redirectTo = location.state?.from || '/dashboard';
+      navigate(redirectTo, { replace: true });
     } catch (e: any) {
       setError(e?.message || 'Login failed.');
     }
@@ -107,13 +103,9 @@ const LoginPage: React.FC = () => {
       // Use the current stub auth rules: any email + password >= 8 chars
       const demoEmail = role === 'admin' ? 'admin@demo.test' : 'member@demo.test';
       const demoPass = 'password1234';
-      const success = await login(demoEmail, demoPass);
-      if (success) {
-        localStorage.setItem('crxq_role', role);
-        navigate('/dashboard', { replace: true });
-      } else {
-        setError('Bypass failed.');
-      }
+      await signIn(demoEmail, demoPass);
+      localStorage.setItem('crxq_role', role);
+      navigate('/dashboard', { replace: true });
     } catch (e: any) {
       setError(e?.message || 'Bypass failed.');
     }
