@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+*database.types.t
+*claude.md
+*crxq_content_explanations.md
