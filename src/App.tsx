@@ -20,7 +20,6 @@ import { Toaster } from 'sonner';
 import ScrollToTop from './components/common/ScrollToTop';
 import BackToTop from './components/common/BackToTop';
 import { AuthProvider } from './components/auth/AuthContext';
-import ProfileGate from './components/profiles/ProfileGate';
 
 /**
  * Protected route component for member-only pages
@@ -33,12 +32,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Login />;
   }
 
-  return (
-    <ProfileGate>
-      {children}
-    </ProfileGate>
-  );
-}
 
 /**
  * App root component
