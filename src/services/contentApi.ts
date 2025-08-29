@@ -381,7 +381,11 @@ export const getGlobalCategory = contentApi.getGlobalCategory.bind(contentApi);
 
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 export default contentApi;
+=======
+export default contentApi;
+>>>>>>> Stashed changes
 =======
 export default contentApi;
 >>>>>>> Stashed changes
