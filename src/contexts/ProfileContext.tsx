@@ -47,6 +47,15 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.error('Error fetching profiles:', fetchError);
       } else {
         const fetchedProfiles = (data as MemberProfile[]) || [];
+        
+        // If no profiles exist, auto-create pharmacy profile
+        if (fetchedProfiles.length === 0) {
+          const pharmacyProfile = await ensurePharmacyProfile(account.account_id);
+          if (pharmacyProfile) {
+            return; // ensurePharmacyProfile will call selectProfile, so exit early
+          }
+        }
+        
         setProfiles(fetchedProfiles);
 
         // Check for a stored active profile for this specific account
@@ -55,9 +64,9 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
         
         if (foundProfile) {
           setActiveProfile(foundProfile);
-        } else {
-          // No valid stored profile, so require user to select one
-          setActiveProfile(null); 
+        } else if (fetchedProfiles.length > 0) {
+          // Auto-select first profile (likely the pharmacy profile)
+          selectProfile(fetchedProfiles[0].profile_id);
         }
       }
       setIsLoading(false);
@@ -93,6 +102,22 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setProfiles(prev => [...prev, newProfile]);
     selectProfile(newProfile.profile_id); // Automatically select the new profile
     return { data: newProfile, error: null };
+  };
+
+  // Auto-create pharmacy profile if account has no profiles
+  const ensurePharmacyProfile = async (accountId: string) => {
+    if (!account?.pharmacy_name) return;
+    
+    const pharmacyProfileData = {
+      first_name: 'Pharmacy',
+      last_name: 'Admin',
+      profile_role: 'Pharmacy' as const,
+      profile_email: account.email,
+      phone_number: account.pharmacy_phone,
+    };
+
+    const result = await createProfile(pharmacyProfileData);
+    return result.data;
   };
 
   const value = {

@@ -11,8 +11,7 @@
  * Now they're stacked properly at the top. Unlike Nikki's boxes, these ARE flat! -Claude
  */
 
-import { getSupabaseAnonKey, getSupabaseUrl } from '../config/supabaseConfig';
-import { supabaseAuth } from '../lib/supabase';
+import { supabase } from '../lib/supabaseClient';
 
 /** Program entity */
 export interface Program {

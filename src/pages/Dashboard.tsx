@@ -7,7 +7,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import AppShell from '../components/layout/AppShell';
 import { useAuth } from '../components/auth/AuthContext';
-import { useProfilesStore } from '../stores/profilesStore';
+import { useProfile } from '../contexts/ProfileContext';
 import { Api } from '../services/dashboardApi';
 import {
   Announcement,
@@ -119,12 +119,9 @@ const QuickCard: React.FC<{ item: QuickAccessItem }> = ({ item }) => {
  * Dashboard component (compact)
  */
 export default function Dashboard() {
-  const { member } = useAuth();
-  const { profiles, currentProfileId } = useProfilesStore();
+  const { account } = useAuth();
+  const { activeProfile, profiles } = useProfile();
   const [programs, setPrograms] = useState<ClinicalProgram[]>([]);
-
-  // Get the current active profile
-  const currentProfile = profiles.find(p => p.id === currentProfileId);
   const [quick, setQuick] = useState<QuickAccessItem[]>([]);
   const [bookmarks, setBookmarks] = useState<ResourceItem[]>([]);
   const [activity, setActivity] = useState<RecentActivity[]>([]);
@@ -134,14 +131,16 @@ export default function Dashboard() {
    * Load dashboard data in parallel.
    */
   useEffect(() => {
+    if (!activeProfile?.profile_id) return; // Wait for profile to be set
+
     let mounted = true;
     async function load() {
       try {
         const [p, q, b, a, an] = await Promise.all([
           Api.getPrograms(),
           Api.getQuickAccess(),
-          Api.getBookmarkedResources(),
-          Api.getRecentActivity(),
+          Api.getBookmarkedResources(activeProfile.profile_id),
+          Api.getRecentActivity(activeProfile.profile_id),
           Api.getAnnouncements(),
         ]);
         if (!mounted) return;
@@ -159,14 +158,18 @@ export default function Dashboard() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [activeProfile?.profile_id]);
 
   return (
     <AppShell
       header={
         <div className="mx-auto flex max-w-[1440px] items-center justify-between px-3 py-3 text-[13px]">
           <div>
-            <div className="text-lg font-semibold">Welcome back, {currentProfile?.firstName ?? member?.pharmacyName ?? 'Member'}</div>
+            <div className="text-lg font-semibold">
+              Welcome back, {activeProfile?.profile_role === 'Pharmacy' 
+                ? account?.pharmacy_name 
+                : `${activeProfile?.first_name} ${activeProfile?.last_name}`}
+            </div>
             {/* Meta row: keep useful context chips */}
             <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-slate-600">
             </div>

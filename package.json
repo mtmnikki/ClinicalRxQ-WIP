@@ -2,9 +2,10 @@
   "name": "web-creator",
   "version": "1.0.0",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "node scripts/build.mjs",
+    "build": "node scripts/build.mjs --production",
+    "preview": "serve dist -s",
+    "netlify:build": "node scripts/build.mjs --production",
     "lint": "node scripts/lint.mjs",
     "lint:fix": "node scripts/lint.mjs --fix"
   },
@@ -37,6 +38,7 @@
     "@radix-ui/react-toggle": "^1.1.6",
     "@radix-ui/react-toggle-group": "^1.1.7",
     "@radix-ui/react-tooltip": "^1.2.4",
+    "@remix-run/router": "^1.23.0",
     "@supabase/supabase-js": "^2.56.0",
     "@typescript-eslint/eslint-plugin": "latest",
     "@typescript-eslint/parser": "latest",
@@ -46,6 +48,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
+    "dotenv": "^16.4.5",
     "embla-carousel-react": "^8.6.0",
     "eslint": "latest",
     "eslint-plugin-jsx-a11y": "latest",
@@ -63,7 +66,9 @@
     "react-i18next": "^15.5.1",
     "react-resizable-panels": "^2.1.9",
     "react-router": "^7.5.3",
+    "react-router-dom": "^7.5.3",
     "recharts": "^2.15.3",
+    "serve": "^14.2.4",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.2.0",
     "vaul": "^1.1.2",
@@ -74,14 +79,14 @@
     "@types/node": "^20.11.0",
     "@types/react": "^19.1.3",
     "@types/react-dom": "^19.1.3",
-    "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.21",
+    "esbuild": "^0.21.5",
+    "esbuild-style-plugin": "^1.6.3",
     "postcss": "^8.5.3",
+    "rimraf": "^5.0.5",
     "supabase": "^2.39.2",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
-    "typescript": "^5.3.3",
-    "vite": "^5.4.19",
-    "vite-plugin-svgr": "^4.5.0"
+    "typescript": "^5.3.3"
   }
 }

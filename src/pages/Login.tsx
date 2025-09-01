@@ -16,7 +16,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
-import { useAuthStore } from '../stores/authStore';
+import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate, Link } from 'react-router';
 import { ShieldCheck, FileText, ClipboardList, PlayCircle } from 'lucide-react';
 import Header from '../components/layout/Header';
@@ -36,7 +36,7 @@ type FormValues = z.infer<typeof schema>
  * Login Page Component with Header and secret alt+click bypass chips
  */
 const LoginPage: React.FC = () => {
-  const { login } = useAuthStore();
+  const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation() as any;
   const [error, setError] = useState<string | null>(null);
@@ -84,8 +84,8 @@ const LoginPage: React.FC = () => {
   const onSubmit = async (data: FormValues) => {
     setError(null);
     try {
-      const success = await login(data.email, data.password);
-      if (success) {
+      const { error: authError } = await signIn(data.email, data.password);
+      if (!authError) {
         const redirectTo = location.state?.from || '/dashboard';
         navigate(redirectTo, { replace: true });
       } else {
@@ -107,8 +107,8 @@ const LoginPage: React.FC = () => {
       // Use the current stub auth rules: any email + password >= 8 chars
       const demoEmail = role === 'admin' ? 'admin@demo.test' : 'member@demo.test';
       const demoPass = 'password1234';
-      const success = await login(demoEmail, demoPass);
-      if (success) {
+      const { error: authError } = await signIn(demoEmail, demoPass);
+      if (!authError) {
         localStorage.setItem('crxq_role', role);
         navigate('/dashboard', { replace: true });
       } else {

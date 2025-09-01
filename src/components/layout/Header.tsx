@@ -9,7 +9,7 @@ import { useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router';
 import { Button } from '../ui/button';
 import { Menu, X, User as UserIcon, LogOut } from 'lucide-react';
-import { useAuthStore } from '../../stores/authStore';
+import { useAuth } from '../../contexts/AuthContext';
 import SafeText from '../common/SafeText';
 import BlackWordLogo from '../../assets/images/blackwordlogo.svg';
 
@@ -18,7 +18,8 @@ import BlackWordLogo from '../../assets/images/blackwordlogo.svg';
  */
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { account, session, signOut } = useAuth();
+  const isAuthenticated = !!session;
   const location = useLocation();
 
   /** Base public nav items (same for public and members) */
@@ -91,7 +92,7 @@ export default function Header() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={logout}
+                  onClick={signOut}
                   className="bg-transparent flex items-center space-x-2 border-gray-300 hover:border-cyan-400 hover:text-cyan-400"
                 >
                   <LogOut className="h-4 w-4" />
@@ -167,7 +168,7 @@ export default function Header() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={logout}
+                    onClick={signOut}
                     className="bg-transparent w-full flex items-center justify-center space-x-2"
                   >
                     <LogOut className="h-4 w-4" />

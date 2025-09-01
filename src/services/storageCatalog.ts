@@ -7,16 +7,18 @@
  * - UI constraint: Titles remove only the last extension; preserve original name/casing.
  */
 
-import {
-  listAllForProgram,
-  listGlobalBilling,
-  listGlobalGuidelines,
-  listGlobalHandouts,
-  StorageFileItem,
-  stripOneExtension,
-  buildPublicUrl,
-} from './supabaseStorage';
-import { getSupabaseAnonKey, getSupabaseUrl } from '../config/supabaseConfig';
+// TEMPORARY: Commenting out old imports to fix build
+// import {
+//   listAllForProgram,
+//   listGlobalBilling,
+//   listGlobalGuidelines,
+//   listGlobalHandouts,
+//   StorageFileItem,
+//   stripOneExtension,
+//   buildPublicUrl,
+// } from './supabaseStorage';
+// import { getSupabaseAnonKey, getSupabaseUrl } from '../config/supabaseConfig';
+import { supabase } from '../lib/supabaseClient';
 
 /** Fixed program slugs present in the bucket (must match folder names exactly) */
 export const ProgramSlugs = [

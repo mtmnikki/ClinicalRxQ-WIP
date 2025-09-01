@@ -3,8 +3,8 @@
  * Provides real data from Supabase for the Dashboard
  */
 
-import { programService, resourceLibraryService, bookmarkService, activityService } from './supabase';
-import { buildPublicUrl } from './supabaseStorage';
+import { supabase } from '../lib/supabaseClient';
+import type { Database } from '../types/database.types';
 import type { 
   Announcement, 
   ClinicalProgram, 
@@ -12,6 +12,10 @@ import type {
   RecentActivity, 
   ResourceItem 
 } from '../types/dashboard';
+
+type BookmarksRow = Database['public']['Tables']['bookmarks']['Row'];
+type RecentActivityRow = Database['public']['Tables']['recent_activity']['Row'];
+type AnnouncementsRow = Database['public']['Tables']['announcements']['Row'];
 
 /**
  * Map program slugs to display names and icons
@@ -53,9 +57,14 @@ export const Api = {
    */
   async getPrograms(): Promise<ClinicalProgram[]> {
     try {
-      const programs = await programService.getAll();
+      const { data: programs, error } = await supabase
+        .from('programs')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
       
-      return programs.map(program => {
+      return (programs || []).map(program => {
         const metadata = PROGRAM_METADATA[program.slug] || {
           name: program.name,
           icon: 'FileText',
@@ -90,7 +99,7 @@ export const Api = {
           subtitle: 'MTM Protocols',
           cta: 'Download',
           icon: 'FileText',
-          url: buildPublicUrl('programs/mtm-future-today/protocols/pharmacist-protocol.pdf'),
+          url: `${supabase.storage.from('clinicalrxqfiles').getPublicUrl('programs/mtm-future-today/protocols/pharmacist-protocol.pdf').data.publicUrl}`,
           external: true,
         },
         {
@@ -130,15 +139,20 @@ export const Api = {
   /**
    * Get bookmarked resources for current user
    */
-  async getBookmarkedResources(): Promise<ResourceItem[]> {
+  async getBookmarkedResources(profileId: string): Promise<ResourceItem[]> {
     try {
-      const bookmarks = await bookmarkService.getUserBookmarks();
-      
-      return bookmarks.map(bookmark => ({
+      const { data: bookmarks, error } = await supabase
+        .from('bookmarks')
+        .select('*')
+        .eq('profile_id', profileId);
+
+      if (error) throw error;
+
+      return (bookmarks || []).map(bookmark => ({
         id: bookmark.id,
-        name: bookmark.resource_id, // This should be enhanced to fetch actual resource name
-        program: bookmark.resource_type,
-        url: '#' // This should be enhanced to build proper URLs
+        name: bookmark.resource_id,
+        program: 'unknown', // Would need to join with resource table to get program
+        url: '#' // Would need resource details to build URL
       }));
     } catch (error) {
       console.error('Error fetching bookmarks:', error);
@@ -149,16 +163,23 @@ export const Api = {
   /**
    * Get recent activity list
    */
-  async getRecentActivity(): Promise<RecentActivity[]> {
+  async getRecentActivity(profileId: string, limit: number = 5): Promise<RecentActivity[]> {
     try {
-      const activities = await activityService.getRecentActivity(5);
-      
-      return activities.map(activity => ({
+      const { data: activities, error } = await supabase
+        .from('recent_activity')
+        .select('*')
+        .eq('profile_id', profileId)
+        .order('accessed_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+
+      return (activities || []).map(activity => ({
         id: activity.id,
         name: activity.resource_name,
         program: activity.resource_type,
-        accessedAtISO: activity.accessed_at,
-        url: '#' // This should be enhanced to build proper URLs
+        accessedAtISO: activity.accessed_at || new Date().toISOString(),
+        url: '#' // Would need resource details to build proper URL
       }));
     } catch (error) {
       console.error('Error fetching recent activity:', error);
@@ -168,12 +189,22 @@ export const Api = {
 
   /**
    * Get announcements
-   * TODO: This should be fetched from a Supabase announcements table
    */
   async getAnnouncements(): Promise<Announcement[]> {
     try {
-      // For now, return empty array until announcements table is created
-      return [];
+      const { data: announcements, error } = await supabase
+        .from('announcements')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return (announcements || []).map(announcement => ({
+        id: announcement.id.toString(),
+        title: announcement.title || 'Announcement',
+        body: announcement.body || '',
+        dateISO: announcement.created_at
+      }));
     } catch (error) {
       console.error('Error fetching announcements:', error);
       return [];
