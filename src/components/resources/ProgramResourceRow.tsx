@@ -5,11 +5,14 @@
  * - Videos show in modal, documents download
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
-import { Download, Play, FileText, Clock } from 'lucide-react';
+import { Download, Play, FileText, Clock, Bookmark, BookmarkCheck } from 'lucide-react';
 import SafeText from '../common/SafeText';
 import VideoModal from '../ui/video-modal';
+import { useBookmarkStore } from '../../stores/bookmarkStore';
+import { useProfile } from '../../contexts/ProfileContext';
+import { activityService } from '../../lib/supabaseClient';
 
 // Interface for resource items
 interface StorageFileItem {
@@ -17,19 +20,36 @@ interface StorageFileItem {
   file_url: string;
   resource_type: string;
   length?: string; // Duration for training modules
+  file_id?: string; // For bookmarking
 }
 
 /**
  * ProgramResourceRow component - Dense desktop layout
  */
 export default function ProgramResourceRow({ item }: { item: StorageFileItem }) {
+  const { activeProfile } = useProfile();
+  const { isBookmarked, toggle, loadBookmarks } = useBookmarkStore();
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  
   const isVideo = item.resource_type === 'training_module';
+  const isSaved = item.file_id ? isBookmarked(item.file_id) : false;
   
   // Remove file extension for cleaner display
   const displayName = item.file_name.replace(/\.[^/.]+$/, '');
 
-  const handleAction = () => {
+  // Load bookmarks when profile changes
+  useEffect(() => {
+    if (activeProfile?.profile_id) {
+      loadBookmarks(activeProfile.profile_id);
+    }
+  }, [activeProfile?.profile_id, loadBookmarks]);
+
+  const handleAction = async () => {
+    // Track file access
+    if (activeProfile?.profile_id && item.file_id) {
+      await activityService.trackFileAccess(item.file_id, activeProfile.profile_id);
+    }
+
     if (isVideo) {
       setIsVideoModalOpen(true);
     } else {
@@ -41,6 +61,12 @@ export default function ProgramResourceRow({ item }: { item: StorageFileItem }) 
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+    }
+  };
+
+  const handleToggleBookmark = async () => {
+    if (activeProfile?.profile_id && item.file_id) {
+      await toggle(item.file_id, activeProfile.profile_id);
     }
   };
 
@@ -69,24 +95,35 @@ export default function ProgramResourceRow({ item }: { item: StorageFileItem }) 
           </div>
         </div>
 
-        {/* Right: Action button */}
-        <Button 
-          size="sm" 
-          onClick={handleAction}
-          className="h-7 px-2 text-xs flex-shrink-0"
-        >
-          {isVideo ? (
-            <>
-              <Play className="mr-1 h-3 w-3" />
-              Play
-            </>
-          ) : (
-            <>
-              <Download className="mr-1 h-3 w-3" />
-              Download
-            </>
+        {/* Right: Bookmark + Action buttons */}
+        <div className="flex items-center gap-2">
+          {item.file_id && (
+            <button
+              onClick={handleToggleBookmark}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 flex-shrink-0"
+              title={isSaved ? 'Remove bookmark' : 'Add bookmark'}
+            >
+              {isSaved ? <BookmarkCheck className="h-3 w-3 text-blue-600" /> : <Bookmark className="h-3 w-3" />}
+            </button>
           )}
-        </Button>
+          <Button 
+            size="sm" 
+            onClick={handleAction}
+            className="h-7 px-2 text-xs flex-shrink-0"
+          >
+            {isVideo ? (
+              <>
+                <Play className="mr-1 h-3 w-3" />
+                Play
+              </>
+            ) : (
+              <>
+                <Download className="mr-1 h-3 w-3" />
+                Download
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Video Modal */}

@@ -9,7 +9,7 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronRight,
@@ -27,6 +27,7 @@ import {
   BookText,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 import { useProfile } from '../../contexts/ProfileContext';
 import LogoImage from '../../assets/images/logoimage.svg';
 
@@ -57,8 +58,12 @@ const PROGRAM_ITEMS: ProgramNavItem[] = [
  */
 export default function MemberSidebar() {
   const location = useLocation();
-  const { signOut, account } = useAuth();
-  const { activeProfile, profiles } = useProfile();
+  const { member } = useAuth();
+  const { logout } = useAuthStore();
+  const { activeProfile } = useProfile();
+
+  // Use the active profile from context
+  const currentProfile = activeProfile;
 
   // Collapsible groups default to collapsed
   const [openPrograms, setOpenPrograms] = useState(false);
@@ -124,9 +129,7 @@ export default function MemberSidebar() {
         <div className="min-w-0">
           <div className="text-[13px] font-semibold leading-5">ClinicalRxQ</div>
           <div className="truncate text-[11px] text-slate-400">
-            {activeProfile?.profile_role === 'Pharmacy' 
-              ? account?.pharmacy_name 
-              : `${activeProfile?.first_name} ${activeProfile?.last_name}`}
+            {currentProfile?.firstName ?? member?.pharmacyName ?? 'Member'}
           </div>
         </div>
       </div>
@@ -277,7 +280,7 @@ export default function MemberSidebar() {
       <div className="border-t border-slate-800 pt-2">
         <button
           type="button"
-          onClick={signOut}
+          onClick={logout}
           className="flex w-full items-center justify-center gap-2 rounded-md bg-slate-800/60 px-3 py-1.5 text-[12px] text-slate-200 hover:bg-slate-800"
         >
           <LogOut className="h-3.5 w-3.5" />

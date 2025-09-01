@@ -9,9 +9,11 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Bookmark, BookmarkCheck, Download, File, FileSpreadsheet, FileText, Play } from 'lucide-react';
 import { useBookmarkStore } from '../../stores/bookmarkStore';
+import { useProfile } from '../../contexts/ProfileContext';
+import { activityService } from '../../lib/supabaseClient';
 import type { StorageFileItem } from '../../services/supabaseStorage';
 import { isDoc, isPdf, isSpreadsheet, isVideo } from '../../services/supabaseStorage';
-import React from 'react';
+import React, { useEffect } from 'react';
 
 export interface ResourceCardProps {
   /** File to render */
@@ -32,8 +34,23 @@ function FileIconFor(item: StorageFileItem) {
  * ResourceCard component
  */
 export default function ResourceCard({ item }: ResourceCardProps) {
-  const isSaved = useBookmarkStore((s) => s.isBookmarked(item.path));
-  const toggle = useBookmarkStore((s) => s.toggle);
+  const { activeProfile } = useProfile();
+  const { isBookmarked, toggle, loadBookmarks } = useBookmarkStore();
+  
+  const isSaved = isBookmarked(item.path);
+
+  // Load bookmarks when profile changes
+  useEffect(() => {
+    if (activeProfile?.profile_id) {
+      loadBookmarks(activeProfile.profile_id);
+    }
+  }, [activeProfile?.profile_id, loadBookmarks]);
+
+  const handleToggleBookmark = async () => {
+    if (activeProfile?.profile_id) {
+      await toggle(item.path, activeProfile.profile_id);
+    }
+  };
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -44,7 +61,7 @@ export default function ResourceCard({ item }: ResourceCardProps) {
         </div>
         <button
           aria-label={isSaved ? 'Remove bookmark' : 'Add bookmark'}
-          onClick={() => toggle(item.path)}
+          onClick={handleToggleBookmark}
           className="rounded-md p-2 hover:bg-slate-100"
           title={isSaved ? 'Unbookmark' : 'Bookmark'}
         >
@@ -53,14 +70,32 @@ export default function ResourceCard({ item }: ResourceCardProps) {
       </CardHeader>
       <CardContent className="flex items-center justify-end gap-2">
         {isVideo(item) ? (
-          <a href={item.url} target="_blank" rel="noreferrer">
+          <a 
+            href={item.url} 
+            target="_blank" 
+            rel="noreferrer"
+            onClick={() => {
+              if (activeProfile?.profile_id && item.path) {
+                activityService.trackFileAccess(item.path, activeProfile.profile_id);
+              }
+            }}
+          >
             <Button variant="outline" className="bg-white">
               <Play className="mr-2 h-4 w-4" />
               Play
             </Button>
           </a>
         ) : null}
-        <a href={item.url} target="_blank" rel="noreferrer">
+        <a 
+          href={item.url} 
+          target="_blank" 
+          rel="noreferrer"
+          onClick={() => {
+            if (activeProfile?.profile_id && item.path) {
+              activityService.trackFileAccess(item.path, activeProfile.profile_id);
+            }
+          }}
+        >
           <Button>
             <Download className="mr-2 h-4 w-4" />
             Download

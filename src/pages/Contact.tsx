@@ -24,7 +24,7 @@ import {
   Lightbulb,
   Clock
 } from 'lucide-react';
-import { Link } from 'react-router';
+import { Link } from 'react-router-dom';
 import SafeText from '../components/common/SafeText';
 
 export default function Contact() {

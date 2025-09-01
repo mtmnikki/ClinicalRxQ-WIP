@@ -30,7 +30,11 @@ import AppShell from '../components/layout/AppShell';
 import MemberSidebar from '../components/layout/MemberSidebar';
 import ProgramResourceRow from '../components/resources/ProgramResourceRow';
 import SafeText from '../components/common/SafeText';
-import { resourceLibraryService, type StorageFile } from '../services/supabaseClient';
+import { catalogService } from '../lib/supabaseClient';
+import type { Database } from '../types/database.types';
+import type { StorageFileItem } from '../services/supabaseStorage';
+
+type StorageFile = Database['public']['Tables']['storage_files_catalog']['Row'];
 
 // ============================================
 // Type Definitions
@@ -292,8 +296,8 @@ export default function Resources() {
       try {
         setLoading(true);
         setError(null);
-        const files = await resourceLibraryService.getAllResources();
-        setAllFiles(files);
+        const { data: files } = await catalogService.getAll();
+        setAllFiles(files || []);
       } catch (err) {
         console.error('Error loading resources:', err);
         setError(err instanceof Error ? err.message : 'Failed to load resources');

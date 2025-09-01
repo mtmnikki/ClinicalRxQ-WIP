@@ -5,7 +5,7 @@
  *   do not jump the user to the top.
  */
 import { useEffect } from 'react';
-import { useLocation } from 'react-router';
+import { useLocation } from 'react-router-dom';
 
 /**
  * Scroll to top when the pathname changes.

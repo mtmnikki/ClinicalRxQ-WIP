@@ -6,9 +6,9 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import AppShell from '../components/layout/AppShell';
-import { useAuth } from '../components/auth/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../contexts/ProfileContext';
-import { Api } from '../services/dashboardApi';
+import { programsService, dashboardService } from '../lib/supabaseClient';
 import {
   Announcement,
   ClinicalProgram,
@@ -25,7 +25,7 @@ import {
   PlayCircle,
   FileText,
 } from 'lucide-react';
-import { Link } from 'react-router';
+import { Link } from 'react-router-dom';
 import MemberSidebar from '../components/layout/MemberSidebar';
 
 /**
@@ -119,9 +119,12 @@ const QuickCard: React.FC<{ item: QuickAccessItem }> = ({ item }) => {
  * Dashboard component (compact)
  */
 export default function Dashboard() {
-  const { account } = useAuth();
-  const { activeProfile, profiles } = useProfile();
+  const { user, account } = useAuth();
+  const { activeProfile } = useProfile();
   const [programs, setPrograms] = useState<ClinicalProgram[]>([]);
+
+  // Use activeProfile from context
+  const currentProfile = activeProfile;
   const [quick, setQuick] = useState<QuickAccessItem[]>([]);
   const [bookmarks, setBookmarks] = useState<ResourceItem[]>([]);
   const [activity, setActivity] = useState<RecentActivity[]>([]);
@@ -131,17 +134,23 @@ export default function Dashboard() {
    * Load dashboard data in parallel.
    */
   useEffect(() => {
-    if (!activeProfile?.profile_id) return; // Wait for profile to be set
-
     let mounted = true;
     async function load() {
+      if (!currentProfile?.profile_id) return;
+      
       try {
         const [p, q, b, a, an] = await Promise.all([
-          Api.getPrograms(),
-          Api.getQuickAccess(),
-          Api.getBookmarkedResources(activeProfile.profile_id),
-          Api.getRecentActivity(activeProfile.profile_id),
-          Api.getAnnouncements(),
+          programsService.getAll().then(({ data }) => data?.map(prog => ({
+            id: prog.id,
+            name: prog.name,
+            slug: prog.slug,
+            description: prog.description || '',
+            experienceLevel: prog.experience_level || '',
+          })) || []),
+          dashboardService.getQuickAccess().then(({ data }) => data || []),
+          dashboardService.getBookmarkedResources().then(({ data }) => data || []),
+          dashboardService.getRecentActivity(currentProfile.profile_id).then(({ data }) => data || []),
+          dashboardService.getAnnouncements().then(({ data }) => data || []),
         ]);
         if (!mounted) return;
         setPrograms(p);
@@ -158,18 +167,14 @@ export default function Dashboard() {
     return () => {
       mounted = false;
     };
-  }, [activeProfile?.profile_id]);
+  }, [currentProfile?.profile_id]);
 
   return (
     <AppShell
       header={
         <div className="mx-auto flex max-w-[1440px] items-center justify-between px-3 py-3 text-[13px]">
           <div>
-            <div className="text-lg font-semibold">
-              Welcome back, {activeProfile?.profile_role === 'Pharmacy' 
-                ? account?.pharmacy_name 
-                : `${activeProfile?.first_name} ${activeProfile?.last_name}`}
-            </div>
+            <div className="text-lg font-semibold">Welcome back, {currentProfile?.first_name ?? account?.pharmacy_name ?? 'Member'}</div>
             {/* Meta row: keep useful context chips */}
             <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-slate-600">
             </div>
@@ -224,26 +229,17 @@ export default function Dashboard() {
                 {activity.map((a) => (
                   <div key={a.id} className="flex items-center justify-between py-2">
                     <div>
-                      <div className="text-[13px] font-medium">{a.name}</div>
+                      <div className="text-[13px] font-medium">{a.resource_name}</div>
                       <div className="text-[12px] text-slate-500">
-                        {a.program?.toUpperCase()} • {new Date(a.accessedAtISO).toLocaleString()}
+                        {a.resource_type?.toUpperCase()} • {new Date(a.accessed_at || '').toLocaleString()}
                       </div>
                     </div>
-                    {a.url ? (
-                      <a href={a.url} target="_blank" rel="noreferrer">
-                        <Button size="sm" variant="outline" className="bg-transparent h-8 px-3">
-                          <Download className="mr-2 h-3.5 w-3.5" />
-                          Re-download
-                        </Button>
-                      </a>
-                    ) : (
-                      <Link to="/resources">
-                        <Button size="sm" variant="outline" className="bg-transparent h-8 px-3">
-                          <Download className="mr-2 h-3.5 w-3.5" />
-                          View in Library
-                        </Button>
-                      </Link>
-                    )}
+                    <Link to="/resources">
+                      <Button size="sm" variant="outline" className="bg-transparent h-8 px-3">
+                        <Download className="mr-2 h-3.5 w-3.5" />
+                        View in Library
+                      </Button>
+                    </Link>
                   </div>
                 ))}
               </div>
